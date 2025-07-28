@@ -27,6 +27,46 @@ class OAuthManager: ObservableObject {
     
     // MARK: - Configuration
     func updateConfiguration(clientId: String, clientSecret: String, accountId: String, redirectUri: String = "fieldpay://callback") {
+        print("Debug: ===== updateConfiguration() called =====")
+        print("Debug: Client ID: \(clientId.prefix(10))... (length: \(clientId.count))")
+        print("Debug: Client Secret: \(clientSecret.prefix(10))... (length: \(clientSecret.count))")
+        print("Debug: Account ID: \(accountId)")
+        print("Debug: Redirect URI: \(redirectUri)")
+        
+        // Validate input parameters
+        guard !clientId.isEmpty else {
+            print("Debug: ERROR - Client ID is empty")
+            return
+        }
+        
+        guard !clientSecret.isEmpty else {
+            print("Debug: ERROR - Client Secret is empty")
+            return
+        }
+        
+        guard !accountId.isEmpty else {
+            print("Debug: ERROR - Account ID is empty")
+            return
+        }
+        
+        guard redirectUri.hasPrefix("fieldpay://") else {
+            print("Debug: ERROR - Invalid redirect URI format")
+            return
+        }
+        
+        // Validate account ID format (should be numeric)
+        guard accountId.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) == nil else {
+            print("Debug: ERROR - Account ID should contain only digits")
+            return
+        }
+        
+        // Validate client ID format (should be alphanumeric)
+        let clientIdCharacterSet = CharacterSet.alphanumerics
+        guard clientId.rangeOfCharacter(from: clientIdCharacterSet.inverted) == nil else {
+            print("Debug: ERROR - Client ID should contain only alphanumeric characters")
+            return
+        }
+        
         self.clientId = clientId
         self.clientSecret = clientSecret
         self.accountId = accountId
@@ -38,7 +78,63 @@ class OAuthManager: ObservableObject {
         UserDefaults.standard.set(accountId, forKey: "netsuite_account_id")
         UserDefaults.standard.set(redirectUri, forKey: "netsuite_redirect_uri")
         
+        // Verify configuration was stored correctly
+        let storedClientId = UserDefaults.standard.string(forKey: "netsuite_client_id")
+        let storedClientSecret = UserDefaults.standard.string(forKey: "netsuite_client_secret")
+        let storedAccountId = UserDefaults.standard.string(forKey: "netsuite_account_id")
+        let storedRedirectUri = UserDefaults.standard.string(forKey: "netsuite_redirect_uri")
+        
+        print("Debug: Configuration storage verification:")
+        print("Debug: Client ID stored: \(storedClientId != nil)")
+        print("Debug: Client Secret stored: \(storedClientSecret != nil)")
+        print("Debug: Account ID stored: \(storedAccountId != nil)")
+        print("Debug: Redirect URI stored: \(storedRedirectUri != nil)")
+        
+        print("Debug: ✅ OAuth configuration updated successfully")
         print("OAuth configured for NetSuite account: \(accountId)")
+    }
+    
+    // MARK: - Configuration Validation
+    func validateOAuthConfiguration() -> Bool {
+        print("Debug: ===== validateOAuthConfiguration() called =====")
+        
+        // Check if all required fields are present
+        let hasClientId = !clientId.isEmpty
+        let hasClientSecret = !clientSecret.isEmpty
+        let hasAccountId = !accountId.isEmpty
+        let hasRedirectUri = !redirectUri.isEmpty && redirectUri.hasPrefix("fieldpay://")
+        
+        print("Debug: Configuration validation:")
+        print("Debug: - Client ID present: \(hasClientId)")
+        print("Debug: - Client Secret present: \(hasClientSecret)")
+        print("Debug: - Account ID present: \(hasAccountId)")
+        print("Debug: - Redirect URI valid: \(hasRedirectUri)")
+        
+        // Validate account ID format
+        let accountIdValid = accountId.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) == nil
+        print("Debug: - Account ID format valid: \(accountIdValid)")
+        
+        // Validate client ID format
+        let clientIdValid = clientId.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) == nil
+        print("Debug: - Client ID format valid: \(clientIdValid)")
+        
+        let isValid = hasClientId && hasClientSecret && hasAccountId && hasRedirectUri && accountIdValid && clientIdValid
+        
+        print("Debug: Overall configuration valid: \(isValid)")
+        
+        if !isValid {
+            print("Debug: ❌ OAuth configuration validation failed")
+            if !hasClientId { print("Debug:   - Missing Client ID") }
+            if !hasClientSecret { print("Debug:   - Missing Client Secret") }
+            if !hasAccountId { print("Debug:   - Missing Account ID") }
+            if !hasRedirectUri { print("Debug:   - Invalid Redirect URI") }
+            if !accountIdValid { print("Debug:   - Invalid Account ID format") }
+            if !clientIdValid { print("Debug:   - Invalid Client ID format") }
+        } else {
+            print("Debug: ✅ OAuth configuration validation passed")
+        }
+        
+        return isValid
     }
     
     private func loadConfiguration() {
@@ -84,10 +180,9 @@ class OAuthManager: ObservableObject {
         print("Debug: accountId: '\(accountId)' (length: \(accountId.count))")
         print("Debug: redirectUri: '\(redirectUri)'")
         
-        guard !clientId.isEmpty && !accountId.isEmpty else {
-            print("Debug: ERROR - OAuth not configured properly")
-            print("Debug: clientId empty: \(clientId.isEmpty)")
-            print("Debug: accountId empty: \(accountId.isEmpty)")
+        // Validate OAuth configuration first
+        guard validateOAuthConfiguration() else {
+            print("Debug: ERROR - OAuth configuration validation failed")
             throw OAuthError.notConfigured
         }
         
@@ -111,8 +206,16 @@ class OAuthManager: ObservableObject {
         userDefaults.set(codeVerifier, forKey: "netsuite_code_verifier")
         userDefaults.set(state, forKey: "netsuite_oauth_state")
         
-        // Build authorization URL
-        var components = URLComponents(string: "https://\(accountId).app.netsuite.com/app/login/oauth2/authorize.nl")!
+        print("Debug: Generated PKCE parameters:")
+        print("Debug: - Code verifier: \(codeVerifier.prefix(10))... (length: \(codeVerifier.count))")
+        print("Debug: - Code challenge: \(codeChallenge.prefix(10))... (length: \(codeChallenge.count))")
+        print("Debug: - State: \(state)")
+        
+        // Build authorization URL according to NetSuite OAuth 2.0 specification
+        // Format: https://{account-id}.app.netsuite.com/app/login/oauth2/authorize.nl
+        let baseURL = "https://\(accountId).app.netsuite.com/app/login/oauth2/authorize.nl"
+        
+        var components = URLComponents(string: baseURL)!
         components.queryItems = [
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "client_id", value: clientId),
@@ -124,10 +227,82 @@ class OAuthManager: ObservableObject {
         ]
         
         guard let authURL = components.url else {
+            print("Debug: ERROR - Failed to construct authorization URL")
+            print("Debug: Base URL: \(baseURL)")
+            print("Debug: Query items: \(components.queryItems ?? [])")
             throw OAuthError.invalidURL
         }
         
-        print("Debug: Generated auth URL: \(authURL)")
+        print("Debug: ✅ Generated OAuth authorization URL successfully")
+        print("Debug: Authorization URL: \(authURL)")
+        print("Debug: URL components:")
+        print("Debug: - Base URL: \(baseURL)")
+        print("Debug: - Response type: code")
+        print("Debug: - Client ID: \(clientId.prefix(10))...")
+        print("Debug: - Redirect URI: \(redirectUri)")
+        print("Debug: - Scope: restlets rest_webservices")
+        print("Debug: - State: \(state)")
+        print("Debug: - Code challenge method: S256")
+        print("Debug: - Code challenge: \(codeChallenge.prefix(10))...")
+        
+        // Validate the URL format
+        guard authURL.scheme == "https" else {
+            print("Debug: ERROR - Authorization URL must use HTTPS")
+            throw OAuthError.invalidURL
+        }
+        
+        guard authURL.host?.contains("netsuite.com") == true else {
+            print("Debug: ERROR - Authorization URL must be a NetSuite domain")
+            throw OAuthError.invalidURL
+        }
+        
+        print("Debug: ✅ Authorization URL validation passed")
+        print("Debug: 🚀 Ready to redirect user to NetSuite OAuth authorization page")
+        return authURL.absoluteString
+    }
+    
+    // MARK: - Debug Methods
+    func generateAuthorizationURLForDebug() -> String? {
+        print("Debug: ===== generateAuthorizationURLForDebug() called =====")
+        
+        // Validate OAuth configuration first
+        guard validateOAuthConfiguration() else {
+            print("Debug: ERROR - OAuth configuration validation failed")
+            return nil
+        }
+        
+        // Generate PKCE challenge for debug
+        let codeVerifier = generateCodeVerifier()
+        let codeChallenge = generateCodeChallenge(from: codeVerifier)
+        let state = generateState()
+        
+        print("Debug: Generated debug PKCE parameters:")
+        print("Debug: - Code verifier: \(codeVerifier.prefix(10))... (length: \(codeVerifier.count))")
+        print("Debug: - Code challenge: \(codeChallenge.prefix(10))... (length: \(codeChallenge.count))")
+        print("Debug: - State: \(state)")
+        
+        // Build authorization URL according to NetSuite OAuth 2.0 specification
+        let baseURL = "https://\(accountId).app.netsuite.com/app/login/oauth2/authorize.nl"
+        
+        var components = URLComponents(string: baseURL)!
+        components.queryItems = [
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "client_id", value: clientId),
+            URLQueryItem(name: "redirect_uri", value: redirectUri),
+            URLQueryItem(name: "scope", value: "restlets rest_webservices"),
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "code_challenge", value: codeChallenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256")
+        ]
+        
+        guard let authURL = components.url else {
+            print("Debug: ERROR - Failed to construct debug authorization URL")
+            return nil
+        }
+        
+        print("Debug: ✅ Generated debug authorization URL successfully")
+        print("Debug: Debug Authorization URL: \(authURL)")
+        
         return authURL.absoluteString
     }
     
@@ -139,6 +314,28 @@ class OAuthManager: ObservableObject {
         print("Debug: URL host: \(url.host ?? "nil")")
         print("Debug: URL path: \(url.path)")
         print("Debug: URL query: \(url.query ?? "nil")")
+        
+        // Verify the callback URL matches our expected redirect URI
+        let expectedScheme = "fieldpay"
+        let expectedHost = "callback"
+        
+        guard url.scheme == expectedScheme else {
+            print("Debug: ERROR - URL scheme mismatch!")
+            print("Debug: Expected scheme: \(expectedScheme)")
+            print("Debug: Actual scheme: \(url.scheme ?? "nil")")
+            throw OAuthError.invalidCallback
+        }
+        
+        guard url.host == expectedHost else {
+            print("Debug: ERROR - URL host mismatch!")
+            print("Debug: Expected host: \(expectedHost)")
+            print("Debug: Actual host: \(url.host ?? "nil")")
+            throw OAuthError.invalidCallback
+        }
+        
+        print("Debug: ✅ Callback URL validation passed")
+        print("Debug: Expected redirect URI: \(redirectUri)")
+        print("Debug: Actual callback URL: \(url.absoluteString)")
         
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             print("Debug: ERROR - Failed to create URLComponents from URL")
@@ -181,6 +378,16 @@ class OAuthManager: ObservableObject {
         // Check for state parameter (optional but recommended)
         if let state = components.queryItems?.first(where: { $0.name == "state" })?.value {
             print("Debug: Found state parameter: \(state)")
+            
+            // Verify state matches what we stored
+            let storedState = UserDefaults.standard.string(forKey: "netsuite_oauth_state")
+            if storedState != state {
+                print("Debug: WARNING - State parameter mismatch!")
+                print("Debug: Expected state: \(storedState ?? "nil")")
+                print("Debug: Actual state: \(state)")
+            } else {
+                print("Debug: ✅ State parameter validation passed")
+            }
         } else {
             print("Debug: No state parameter found in callback")
         }
@@ -319,18 +526,37 @@ class OAuthManager: ObservableObject {
         }
         
         // Store tokens securely
-        await storeTokens(accessToken: tokenResponse.accessToken, refreshToken: tokenResponse.refreshToken)
+        try await storeTokens(accessToken: tokenResponse.accessToken, refreshToken: tokenResponse.refreshToken)
         
         // Configure NetSuiteAPI with the new tokens
         NetSuiteAPI.shared.configure(accountId: accountId, accessToken: tokenResponse.accessToken)
         print("Debug: NetSuiteAPI configured with account ID: \(accountId) and access token")
         
+        // Verify NetSuiteAPI configuration
+        let isConfigured = NetSuiteAPI.shared.isConfigured()
+        print("Debug: NetSuiteAPI configuration verification: \(isConfigured)")
+        
+        if !isConfigured {
+            print("Debug: ERROR - NetSuiteAPI not properly configured after OAuth!")
+            throw OAuthError.tokenExchangeFailed
+        }
+        
         // Test the connection immediately
         do {
             try await NetSuiteAPI.shared.testConnection()
             print("Debug: ✅ NetSuite connection test successful after OAuth")
+            
+            // Verify we can make a real API call
+            do {
+                let customers = try await NetSuiteAPI.shared.fetchCustomers()
+                print("Debug: ✅ Real API call successful - fetched \(customers.count) customers")
+            } catch {
+                print("Debug: ⚠️ Real API call failed: \(error)")
+            }
+            
         } catch {
             print("Debug: ⚠️ NetSuite connection test failed after OAuth: \(error)")
+            throw OAuthError.tokenExchangeFailed
         }
         
         // Clear OAuth session data after successful token exchange
@@ -390,7 +616,7 @@ class OAuthManager: ObservableObject {
         }
         
         // Store updated tokens
-        await storeTokens(accessToken: tokenResponse.accessToken, refreshToken: tokenResponse.refreshToken)
+        try await storeTokens(accessToken: tokenResponse.accessToken, refreshToken: tokenResponse.refreshToken)
         
         // Configure NetSuiteAPI with the updated tokens
         NetSuiteAPI.shared.configure(accountId: accountId, accessToken: tokenResponse.accessToken)
@@ -431,7 +657,7 @@ class OAuthManager: ObservableObject {
     }
     
     // MARK: - Token Storage
-    private func storeTokens(accessToken: String, refreshToken: String) async {
+    private func storeTokens(accessToken: String, refreshToken: String) async throws {
         print("Debug: ===== storeTokens() called ======")
         print("Debug: Storing access token: \(accessToken.prefix(10))... (length: \(accessToken.count))")
         print("Debug: Storing refresh token: \(refreshToken.prefix(10))... (length: \(refreshToken.count))")
@@ -464,6 +690,29 @@ class OAuthManager: ObservableObject {
         print("Debug: Refresh token stored: \(storedRefreshToken != nil)")
         print("Debug: Expiry stored: \(storedExpiry != nil)")
         print("Debug: Stored access token matches: \(storedAccessToken?.prefix(10) ?? "nil")...")
+        
+        // Verify token integrity
+        guard let storedAccessToken = storedAccessToken,
+              let storedRefreshToken = storedRefreshToken,
+              let storedExpiry = storedExpiry else {
+            print("Debug: ERROR - Token storage verification failed!")
+            throw OAuthError.tokenExchangeFailed
+        }
+        
+        guard storedAccessToken == accessToken else {
+            print("Debug: ERROR - Stored access token doesn't match original!")
+            throw OAuthError.tokenExchangeFailed
+        }
+        
+        guard storedRefreshToken == refreshToken else {
+            print("Debug: ERROR - Stored refresh token doesn't match original!")
+            throw OAuthError.tokenExchangeFailed
+        }
+        
+        print("Debug: ✅ Token storage verification passed")
+        print("Debug: Access token integrity: ✅")
+        print("Debug: Refresh token integrity: ✅")
+        print("Debug: Expiry date integrity: ✅")
         
         // Configure NetSuiteAPI with the new tokens
         NetSuiteAPI.shared.configure(accountId: accountId, accessToken: accessToken)
@@ -650,6 +899,27 @@ class OAuthManager: ObservableObject {
             print("Debug: Access token: \(accessToken.prefix(10))... (length: \(accessToken.count))")
             print("Debug: Refresh token: \(refreshToken.prefix(10))... (length: \(refreshToken.count))")
             print("Debug: Token expiry: \(expiryDate)")
+            print("Debug: Current time: \(Date())")
+            print("Debug: Token valid: \(Date() < expiryDate)")
+            
+            // Validate token format and length
+            guard accessToken.count > 10 else {
+                print("Debug: ERROR - Stored access token is too short, likely invalid")
+                await clearAllTokens()
+                DispatchQueue.main.async {
+                    self.isAuthenticated = false
+                }
+                return
+            }
+            
+            guard refreshToken.count > 10 else {
+                print("Debug: ERROR - Stored refresh token is too short, likely invalid")
+                await clearAllTokens()
+                DispatchQueue.main.async {
+                    self.isAuthenticated = false
+                }
+                return
+            }
             
             // Check if token is expired
             let now = Date()
@@ -659,13 +929,42 @@ class OAuthManager: ObservableObject {
                 print("Debug: Current time: \(now)")
                 print("Debug: Time difference: \(now.timeIntervalSince(expiryDate)) seconds")
                 
-                // Clear expired tokens
-                await clearAllTokens()
-                DispatchQueue.main.async {
-                    self.isAuthenticated = false
+                // Try to refresh the token first
+                do {
+                    print("Debug: Attempting to refresh expired token...")
+                    let newTokens = try await refreshAccessToken(refreshToken: refreshToken)
+                    print("Debug: ✅ Token refresh successful")
+                    
+                    // Update internal state with new tokens
+                    DispatchQueue.main.async {
+                        self.accessToken = newTokens.accessToken
+                        self.refreshToken = newTokens.refreshToken
+                        self.isAuthenticated = true
+                    }
+                    
+                    // Configure NetSuiteAPI with new tokens
+                    NetSuiteAPI.shared.configure(accountId: accountId, accessToken: newTokens.accessToken)
+                    print("Debug: NetSuiteAPI configured with refreshed tokens")
+                    
+                    // Test the connection with new tokens
+                    do {
+                        try await NetSuiteAPI.shared.testConnection()
+                        print("Debug: ✅ Connection test successful with refreshed tokens")
+                    } catch {
+                        print("Debug: ⚠️ Connection test failed with refreshed tokens: \(error)")
+                    }
+                    
+                    return
+                } catch {
+                    print("Debug: ❌ Token refresh failed: \(error)")
+                    // Clear expired tokens if refresh failed
+                    await clearAllTokens()
+                    DispatchQueue.main.async {
+                        self.isAuthenticated = false
+                    }
+                    print("Debug: Cleared expired tokens and set isAuthenticated = false")
+                    return
                 }
-                print("Debug: Cleared expired tokens and set isAuthenticated = false")
-                return
             }
             
             // Check if we have required OAuth configuration
@@ -697,6 +996,22 @@ class OAuthManager: ObservableObject {
             
             // Configure NetSuiteAPI
             NetSuiteAPI.shared.configure(accountId: accountId, accessToken: accessToken)
+            print("Debug: NetSuiteAPI configured with valid tokens")
+            
+            // Test the connection to verify tokens work
+            do {
+                try await NetSuiteAPI.shared.testConnection()
+                print("Debug: ✅ Connection test successful with stored tokens")
+            } catch {
+                print("Debug: ⚠️ Connection test failed with stored tokens: \(error)")
+                // If connection test fails, the tokens might be invalid
+                print("Debug: Clearing tokens due to failed connection test")
+                await clearAllTokens()
+                DispatchQueue.main.async {
+                    self.isAuthenticated = false
+                }
+                return
+            }
             
             print("Debug: SUCCESS - Valid authentication state confirmed")
             print("Debug: isAuthenticated set to: true")
@@ -743,6 +1058,56 @@ class OAuthManager: ObservableObject {
         }
         
         print("Debug: All OAuth data cleared")
+    }
+    
+    // MARK: - OAuth Flow Verification
+    func verifyOAuthFlow() async -> Bool {
+        print("Debug: ===== verifyOAuthFlow() called =====")
+        
+        let userDefaults = UserDefaults.standard
+        
+        // Check OAuth configuration
+        let clientId = userDefaults.string(forKey: "netsuite_client_id") ?? ""
+        let clientSecret = userDefaults.string(forKey: "netsuite_client_secret") ?? ""
+        let accountId = userDefaults.string(forKey: "netsuite_account_id") ?? ""
+        let redirectUri = userDefaults.string(forKey: "netsuite_redirect_uri") ?? ""
+        
+        print("Debug: OAuth Configuration Check:")
+        print("Debug: - Client ID: \(clientId.isEmpty ? "❌ Missing" : "✅ Present")")
+        print("Debug: - Client Secret: \(clientSecret.isEmpty ? "❌ Missing" : "✅ Present")")
+        print("Debug: - Account ID: \(accountId.isEmpty ? "❌ Missing" : "✅ Present")")
+        print("Debug: - Redirect URI: \(redirectUri.isEmpty ? "❌ Missing" : "✅ Present")")
+        
+        // Check stored tokens
+        let accessToken = userDefaults.string(forKey: "netsuite_access_token")
+        let refreshToken = userDefaults.string(forKey: "netsuite_refresh_token")
+        let expiryDate = userDefaults.object(forKey: "netsuite_token_expiry") as? Date
+        
+        print("Debug: Token Status Check:")
+        print("Debug: - Access Token: \(accessToken == nil ? "❌ Missing" : "✅ Present")")
+        print("Debug: - Refresh Token: \(refreshToken == nil ? "❌ Missing" : "✅ Present")")
+        print("Debug: - Expiry Date: \(expiryDate == nil ? "❌ Missing" : "✅ Present")")
+        
+        if let expiryDate = expiryDate {
+            let isValid = Date() < expiryDate
+            print("Debug: - Token Valid: \(isValid ? "✅ Valid" : "❌ Expired")")
+        }
+        
+        // Check NetSuiteAPI configuration
+        let isNetSuiteConfigured = NetSuiteAPI.shared.isConfigured()
+        print("Debug: NetSuiteAPI Configuration: \(isNetSuiteConfigured ? "✅ Configured" : "❌ Not Configured")")
+        
+        // Check authentication state
+        print("Debug: Authentication State: \(isAuthenticated ? "✅ Authenticated" : "❌ Not Authenticated")")
+        
+        // Determine overall status
+        let hasConfiguration = !clientId.isEmpty && !clientSecret.isEmpty && !accountId.isEmpty && !redirectUri.isEmpty
+        let hasValidTokens = accessToken != nil && refreshToken != nil && expiryDate != nil && (expiryDate ?? Date()) > Date()
+        let isFullyConfigured = hasConfiguration && hasValidTokens && isNetSuiteConfigured && isAuthenticated
+        
+        print("Debug: Overall OAuth Flow Status: \(isFullyConfigured ? "✅ Complete" : "❌ Incomplete")")
+        
+        return isFullyConfigured
     }
 }
 

@@ -16,6 +16,7 @@ struct NetSuiteDebugView: View {
     @State private var isLoading = false
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var loadingTask: String? = nil
     
     var body: some View {
         NavigationView {
@@ -68,12 +69,41 @@ struct NetSuiteDebugView: View {
                             .font(.headline)
                         
                         VStack(spacing: 8) {
-                            DebugButton(title: "Test Connection", action: testConnection)
-                            DebugButton(title: "Fetch Customers", action: fetchCustomers)
-                            DebugButton(title: "Fetch Invoices", action: fetchInvoices)
-                            DebugButton(title: "Test Raw Customer API", action: testRawCustomerAPI)
-                            DebugButton(title: "Test Raw Invoice API", action: testRawInvoiceAPI)
-                            DebugButton(title: "Clear Debug Output", action: clearDebugOutput)
+                            DebugButton(
+                                title: "Test Connection",
+                                isLoading: isLoading && loadingTask == "connection",
+                                action: { performAPITest("connection", testConnection) }
+                            )
+                            DebugButton(
+                                title: "Fetch Customers",
+                                isLoading: isLoading && loadingTask == "customers",
+                                action: { performAPITest("customers", fetchCustomers) }
+                            )
+                            DebugButton(
+                                title: "Fetch Invoices",
+                                isLoading: isLoading && loadingTask == "invoices",
+                                action: { performAPITest("invoices", fetchInvoices) }
+                            )
+                            DebugButton(
+                                title: "Test Raw Customer API",
+                                isLoading: isLoading && loadingTask == "raw_customer",
+                                action: { performAPITest("raw_customer", testRawCustomerAPI) }
+                            )
+                            DebugButton(
+                                title: "Test Raw Invoice API",
+                                isLoading: isLoading && loadingTask == "raw_invoice",
+                                action: { performAPITest("raw_invoice", testRawInvoiceAPI) }
+                            )
+                            DebugButton(
+                                title: "Generate OAuth URL",
+                                isLoading: isLoading && loadingTask == "oauth_url",
+                                action: { performAPITest("oauth_url", generateOAuthURL) }
+                            )
+                            DebugButton(
+                                title: "Clear Debug Output",
+                                isLoading: false,
+                                action: clearDebugOutput
+                            )
                         }
                     }
                     
@@ -83,10 +113,11 @@ struct NetSuiteDebugView: View {
                             Text("Debug Output")
                                 .font(.headline)
                             Spacer()
-                            Button("Copy") {
+                            Button("Copy All") {
                                 UIPasteboard.general.string = debugOutput
                             }
                             .font(.caption)
+                            .disabled(debugOutput.isEmpty)
                         }
                         
                         ScrollView {
@@ -110,147 +141,204 @@ struct NetSuiteDebugView: View {
             } message: {
                 Text(alertMessage)
             }
+            .overlay(
+                // Loading overlay for better UX
+                Group {
+                    if isLoading {
+                        VStack {
+                            ProgressView()
+                                .scaleEffect(1.2)
+                            Text("\(loadingTask?.replacingOccurrences(of: "_", with: " ").capitalized ?? "Loading")...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 8)
+                        }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .shadow(radius: 4)
+                    }
+                }
+            )
         }
     }
     
+    // MARK: - Helper Methods
+    
+    /// Generic API test wrapper with proper loading state management
+    private func performAPITest(_ taskName: String, _ operation: @escaping () async throws -> Void) {
+        guard !isLoading else { return } // Prevent multiple simultaneous operations
+        
+        isLoading = true
+        loadingTask = taskName
+        
+        Task {
+            defer {
+                // Ensure loading state is always reset, even if task is cancelled
+                Task { @MainActor in
+                    isLoading = false
+                    loadingTask = nil
+                }
+            }
+            
+            do {
+                try await operation()
+            } catch {
+                handleError(error, for: taskName)
+            }
+        }
+    }
+    
+    /// Centralized error handling with detailed error information
+    @MainActor
+    private func handleError(_ error: Error, for taskName: String) {
+        let errorMessage = formatErrorMessage(error, for: taskName)
+        log("❌ \(taskName.replacingOccurrences(of: "_", with: " ").capitalized) failed: \(errorMessage)")
+        alertMessage = errorMessage
+        showingAlert = true
+    }
+    
+    /// Enhanced error formatting with API-specific error details
+    private func formatErrorMessage(_ error: Error, for taskName: String) -> String {
+        if let netSuiteError = error as? NetSuiteError {
+            switch netSuiteError {
+            case .notConfigured:
+                return "NetSuite API not configured. Please check your account ID and access token."
+            case .requestFailed:
+                return "API request failed. Check your network connection and API credentials."
+            case .invalidResponse:
+                return "Invalid response from NetSuite API. The response format may have changed."
+            case .authenticationFailed:
+                return "Authentication failed. Your access token may be expired or invalid."
+            }
+        }
+        
+        // Handle network errors with more detail
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet:
+                return "No internet connection available."
+            case .timedOut:
+                return "Request timed out. The server may be slow or unavailable."
+            case .cannotFindHost:
+                return "Cannot find NetSuite server. Check your account ID configuration."
+            case .userAuthenticationRequired:
+                return "Unauthorized access. Check your API credentials."
+            default:
+                return "Network error: \(urlError.localizedDescription)"
+            }
+        }
+        
+        return error.localizedDescription
+    }
+    
+    /// Enhanced logging with better formatting and timestamps
     private func log(_ message: String) {
         DispatchQueue.main.async {
             let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-            debugOutput += "[\(timestamp)] \(message)\n"
+            let formattedMessage = "[\(timestamp)] \(message)"
+            debugOutput += formattedMessage + "\n"
+            
+            // Auto-scroll to bottom for better UX
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // This would require a ScrollViewReader in a more complex implementation
+                // For now, we'll just append to the output
+            }
         }
     }
     
-    private func testConnection() {
-        isLoading = true
+    // MARK: - API Test Methods
+    
+    private func testConnection() async throws {
         log("🔍 Testing NetSuite connection...")
-        
-        Task {
-            do {
-                try await netSuiteAPIDebug.testConnection()
-                log("✅ Connection test successful!")
-                await MainActor.run {
-                    alertMessage = "Connection test successful!"
-                    showingAlert = true
-                }
-            } catch {
-                log("❌ Connection test failed: \(error.localizedDescription)")
-                await MainActor.run {
-                    alertMessage = "Connection test failed: \(error.localizedDescription)"
-                    showingAlert = true
-                }
-            }
-            await MainActor.run {
-                isLoading = false
-            }
+        try await netSuiteAPIDebug.testConnection()
+        log("✅ Connection test successful!")
+        await MainActor.run {
+            alertMessage = "Connection test successful!"
+            showingAlert = true
         }
     }
     
-    private func fetchCustomers() {
-        isLoading = true
+    private func fetchCustomers() async throws {
         log("🔍 Fetching customers...")
+        let customers = try await netSuiteAPIDebug.fetchCustomers()
+        log("✅ Successfully fetched \(customers.count) customers")
         
-        Task {
-            do {
-                let customers = try await netSuiteAPIDebug.fetchCustomers()
-                log("✅ Successfully fetched \(customers.count) customers")
-                for (index, customer) in customers.enumerated() {
-                    log("  \(index + 1). \(customer.name) (ID: \(customer.id))")
-                }
-                await MainActor.run {
-                    alertMessage = "Successfully fetched \(customers.count) customers"
-                    showingAlert = true
-                }
-            } catch {
-                log("❌ Failed to fetch customers: \(error.localizedDescription)")
-                await MainActor.run {
-                    alertMessage = "Failed to fetch customers: \(error.localizedDescription)"
-                    showingAlert = true
-                }
-            }
-            await MainActor.run {
-                isLoading = false
-            }
+        // Log customer details with better formatting
+        for (index, customer) in customers.enumerated() {
+            log("  📋 \(index + 1). \(customer.name) (ID: \(customer.id))")
+        }
+        
+        await MainActor.run {
+            alertMessage = "Successfully fetched \(customers.count) customers"
+            showingAlert = true
         }
     }
     
-    private func fetchInvoices() {
-        isLoading = true
+    private func fetchInvoices() async throws {
         log("🔍 Fetching invoices...")
+        let invoices = try await netSuiteAPIDebug.fetchInvoices()
+        log("✅ Successfully fetched \(invoices.count) invoices")
         
-        Task {
-            do {
-                let invoices = try await netSuiteAPIDebug.fetchInvoices()
-                log("✅ Successfully fetched \(invoices.count) invoices")
-                for (index, invoice) in invoices.enumerated() {
-                    log("  \(index + 1). \(invoice.invoiceNumber) - \(invoice.customerName) ($\(invoice.amount))")
-                }
-                await MainActor.run {
-                    alertMessage = "Successfully fetched \(invoices.count) invoices"
-                    showingAlert = true
-                }
-            } catch {
-                log("❌ Failed to fetch invoices: \(error.localizedDescription)")
-                await MainActor.run {
-                    alertMessage = "Failed to fetch invoices: \(error.localizedDescription)"
-                    showingAlert = true
-                }
-            }
-            await MainActor.run {
-                isLoading = false
-            }
+        // Log invoice details with better formatting
+        for (index, invoice) in invoices.enumerated() {
+            log("  📄 \(index + 1). \(invoice.invoiceNumber) - \(invoice.customerName) ($\(String(format: "%.2f", NSDecimalNumber(decimal: invoice.amount).doubleValue)))")
+        }
+        
+        await MainActor.run {
+            alertMessage = "Successfully fetched \(invoices.count) invoices"
+            showingAlert = true
         }
     }
     
-    private func testRawCustomerAPI() {
-        isLoading = true
+    private func testRawCustomerAPI() async throws {
         log("🔍 Testing raw customer API...")
-        
-        Task {
-            do {
-                let response = try await netSuiteAPIDebug.testRawAPI(endpoint: "/services/rest/record/v1/customer?limit=5")
-                log("✅ Raw customer API response:")
-                log(response)
-                await MainActor.run {
-                    alertMessage = "Raw customer API test successful"
-                    showingAlert = true
-                }
-            } catch {
-                log("❌ Raw customer API test failed: \(error.localizedDescription)")
-                await MainActor.run {
-                    alertMessage = "Raw customer API test failed: \(error.localizedDescription)"
-                    showingAlert = true
-                }
-            }
+        let response = try await netSuiteAPIDebug.testRawAPI(endpoint: "/services/rest/record/v1/customer?limit=5")
+        log("✅ Raw customer API response:")
+        log(formatJSONResponse(response))
+        await MainActor.run {
+            alertMessage = "Raw customer API test successful"
+            showingAlert = true
+        }
+    }
+    
+    private func testRawInvoiceAPI() async throws {
+        log("🔍 Testing raw invoice API...")
+        let response = try await netSuiteAPIDebug.testRawAPI(endpoint: "/services/rest/record/v1/invoice?limit=5")
+        log("✅ Raw invoice API response:")
+        log(formatJSONResponse(response))
+        await MainActor.run {
+            alertMessage = "Raw invoice API test successful"
+            showingAlert = true
+        }
+    }
+    
+    private func generateOAuthURL() async throws {
+        log("🔍 Generating OAuth authorization URL...")
+        if let url = oAuthManager.generateAuthorizationURLForDebug() {
+            log("✅ Authorization URL: \(url)")
             await MainActor.run {
-                isLoading = false
+                alertMessage = "Authorization URL generated successfully"
+                showingAlert = true
+            }
+        } else {
+            log("❌ Failed to generate authorization URL")
+            await MainActor.run {
+                alertMessage = "Failed to generate authorization URL"
+                showingAlert = true
             }
         }
     }
     
-    private func testRawInvoiceAPI() {
-        isLoading = true
-        log("🔍 Testing raw invoice API...")
-        
-        Task {
-            do {
-                let response = try await netSuiteAPIDebug.testRawAPI(endpoint: "/services/rest/record/v1/invoice?limit=5")
-                log("✅ Raw invoice API response:")
-                log(response)
-                await MainActor.run {
-                    alertMessage = "Raw invoice API test successful"
-                    showingAlert = true
-                }
-            } catch {
-                log("❌ Raw invoice API test failed: \(error.localizedDescription)")
-                await MainActor.run {
-                    alertMessage = "Raw invoice API test failed: \(error.localizedDescription)"
-                    showingAlert = true
-                }
-            }
-            await MainActor.run {
-                isLoading = false
-            }
+    /// Format JSON response for better readability in debug output
+    private func formatJSONResponse(_ response: String) -> String {
+        guard let data = response.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data),
+              let prettyData = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted),
+              let prettyString = String(data: prettyData, encoding: .utf8) else {
+            return response
         }
+        return prettyString
     }
     
     private func clearDebugOutput() {
@@ -260,24 +348,37 @@ struct NetSuiteDebugView: View {
 
 struct DebugButton: View {
     let title: String
+    let isLoading: Bool
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             HStack {
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .frame(width: 16, height: 16)
+                }
+                
                 Text(title)
                     .font(.subheadline)
                     .fontWeight(.medium)
+                
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                
+                if !isLoading {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding()
             .background(Color(.systemGray6))
             .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isLoading)
+        .opacity(isLoading ? 0.6 : 1.0)
     }
 }
 

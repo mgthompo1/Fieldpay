@@ -24,7 +24,103 @@ struct NetSuiteLink: Codable {
     let href: String
 }
 
-// NetSuite Customer Response Model
+// MARK: - Enhanced Status Enums
+
+enum NetSuiteInvoiceStatus: String, CaseIterable {
+    case paid = "paid"
+    case overdue = "overdue"
+    case cancelled = "cancelled"
+    case pending = "pending"
+    case draft = "draft"
+    case approved = "approved"
+    case closed = "closed"
+    case unknown = "unknown"
+    
+    init(rawValue: String?) {
+        guard let rawValue = rawValue?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else {
+            self = .unknown
+            return
+        }
+        
+        switch rawValue {
+        case "paid", "payment_received":
+            self = .paid
+        case "overdue", "past_due":
+            self = .overdue
+        case "cancelled", "canceled", "void":
+            self = .cancelled
+        case "pending", "open":
+            self = .pending
+        case "draft":
+            self = .draft
+        case "approved":
+            self = .approved
+        case "closed":
+            self = .closed
+        default:
+            self = .unknown
+        }
+    }
+}
+
+// MARK: - Enhanced Date Parsing
+
+struct NetSuiteDateParser {
+    private static let iso8601Formatter = ISO8601DateFormatter()
+    private static let iso8601WithFractionalSecondsFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    private static let dateOnlyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone.current
+        return formatter
+    }()
+    private static let fullDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+        formatter.timeZone = TimeZone.current
+        return formatter
+    }()
+    
+    static func parseDate(_ dateString: String?) -> Date? {
+        guard let dateString = dateString?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !dateString.isEmpty else {
+            return nil
+        }
+        
+        // Try ISO8601 formatters first
+        if let date = iso8601Formatter.date(from: dateString) {
+            return date
+        }
+        
+        if let date = iso8601WithFractionalSecondsFormatter.date(from: dateString) {
+            return date
+        }
+        
+        // Try DateFormatter formats
+        if let date = fullDateFormatter.date(from: dateString) {
+            return date
+        }
+        
+        if let date = dateOnlyFormatter.date(from: dateString) {
+            return date
+        }
+        
+        // Log parsing failure for debugging
+        print("⚠️ DEBUG: NetSuiteDateParser - Failed to parse date: '\(dateString)'")
+        return nil
+    }
+    
+    static func parseDateWithFallback(_ dateString: String?, fallback: Date = Date()) -> Date {
+        return parseDate(dateString) ?? fallback
+    }
+}
+
+// MARK: - Enhanced Customer Response Model
+
 struct NetSuiteCustomerResponse: Codable {
     let id: String
     let entityId: String?
@@ -67,9 +163,19 @@ struct NetSuiteAddress: Codable {
     let isResidential: Bool?
     let isDefaultBilling: Bool?
     let isDefaultShipping: Bool?
+    
+    var isDefault: Bool {
+        return isDefaultBilling == true || isDefaultShipping == true
+    }
+    
+    var fullAddress: String {
+        let components = [addr1, addr2, city, state, zip, country].compactMap { $0 }
+        return components.joined(separator: ", ")
+    }
 }
 
-// NetSuite Invoice Response Model
+// MARK: - Enhanced Invoice Response Model
+
 struct NetSuiteInvoiceResponse: Codable {
     let id: String
     let tranId: String?
@@ -116,37 +222,76 @@ struct NetSuiteInvoiceItem: Codable {
     let rate: Double?
     let amount: Double?
     let grossAmount: Double?
+    
+    // Enhanced null safety with validation
+    var validatedQuantity: Double {
+        guard let quantity = quantity, quantity > 0 else {
+            print("⚠️ DEBUG: NetSuiteInvoiceItem - Invalid quantity: \(quantity ?? 0), using 1.0")
+            return 1.0
+        }
+        return quantity
+    }
+    
+    var validatedRate: Double {
+        guard let rate = rate, rate >= 0 else {
+            print("⚠️ DEBUG: NetSuiteInvoiceItem - Invalid rate: \(rate ?? 0), using 0.0")
+            return 0.0
+        }
+        return rate
+    }
+    
+    var validatedAmount: Double {
+        guard let amount = amount, amount >= 0 else {
+            print("⚠️ DEBUG: NetSuiteInvoiceItem - Invalid amount: \(amount ?? 0), calculating from quantity * rate")
+            return validatedQuantity * validatedRate
+        }
+        return amount
+    }
 }
 
-// MARK: - Conversion Extensions
+// MARK: - Enhanced Conversion Extensions
 
 extension NetSuiteCustomerResponse {
     func toCustomer() -> Customer {
-        let fullName = [firstName, lastName].compactMap { $0 }.joined(separator: " ")
-        let displayName = fullName.isEmpty ? (companyName ?? "Unknown Customer") : fullName
+        // Enhanced name handling
+        let fullName = [firstName, lastName].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.joined(separator: " ")
+        let displayName = fullName.isEmpty ? (companyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown Customer") : fullName
         
-        let address = addressbookList?.addressbook?.first.map { addr in
+        // Enhanced address handling with multiple address support
+        let addresses = addressbookList?.addressbook ?? []
+        let primaryAddress = addresses.first { $0.isDefault } ?? addresses.first
+        
+        let address = primaryAddress.map { addr in
             Customer.Address(
-                street: [addr.addr1, addr.addr2].compactMap { $0 }.joined(separator: " "),
-                city: addr.city,
-                state: addr.state,
-                zipCode: addr.zip,
-                country: addr.country
+                street: [addr.addr1, addr.addr2]
+                    .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " "),
+                city: addr.city?.trimmingCharacters(in: .whitespacesAndNewlines),
+                state: addr.state?.trimmingCharacters(in: .whitespacesAndNewlines),
+                zipCode: addr.zip?.trimmingCharacters(in: .whitespacesAndNewlines),
+                country: addr.country?.trimmingCharacters(in: .whitespacesAndNewlines)
             )
         }
         
-        let dateFormatter = ISO8601DateFormatter()
-        let createdDate = dateFormatter.date(from: dateCreated ?? "") ?? Date()
-        let modifiedDate = dateFormatter.date(from: lastModifiedDate ?? "") ?? Date()
+        // Enhanced date parsing with fallbacks
+        let createdDate = NetSuiteDateParser.parseDateWithFallback(dateCreated)
+        let modifiedDate = NetSuiteDateParser.parseDateWithFallback(lastModifiedDate, fallback: createdDate)
+        
+        // Enhanced email validation
+        let validatedEmail = email?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? email : nil
+        
+        // Enhanced phone validation
+        let validatedPhone = phone?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? phone : nil
         
         return Customer(
-            id: id,
+            id: id, // Use NetSuite ID directly for consistency
             name: displayName,
-            email: email,
-            phone: phone,
+            email: validatedEmail,
+            phone: validatedPhone,
             address: address,
             netSuiteId: entityId,
-            companyName: companyName,
+            companyName: companyName?.trimmingCharacters(in: .whitespacesAndNewlines),
             isActive: !(isInactive ?? false),
             createdDate: createdDate,
             lastModifiedDate: modifiedDate
@@ -156,47 +301,129 @@ extension NetSuiteCustomerResponse {
 
 extension NetSuiteInvoiceResponse {
     func toInvoice() -> Invoice {
-        let dateFormatter = ISO8601DateFormatter()
-        let createdDate = dateFormatter.date(from: dateCreated ?? "") ?? Date()
-        let modifiedDate = dateFormatter.date(from: lastModifiedDate ?? "") ?? Date()
-        let dueDate = dateFormatter.date(from: self.dueDate ?? "")
+        // Enhanced date parsing with fallbacks
+        let createdDate = NetSuiteDateParser.parseDateWithFallback(dateCreated)
+        let _ = NetSuiteDateParser.parseDateWithFallback(lastModifiedDate, fallback: createdDate)
+        let dueDate = NetSuiteDateParser.parseDate(dueDate)
         
-        let items = itemList?.item?.map { item in
-            Invoice.InvoiceItem(
-                id: UUID().uuidString,
-                description: item.description ?? "",
-                quantity: item.quantity ?? 0,
-                unitPrice: Decimal(item.rate ?? 0),
-                amount: Decimal(item.amount ?? 0),
+        // Enhanced item processing with better error handling
+        let items = itemList?.item?.compactMap { item -> Invoice.InvoiceItem? in
+            // Skip items with invalid data
+            guard item.validatedQuantity > 0 || item.validatedAmount > 0 else {
+                print("⚠️ DEBUG: NetSuiteInvoiceResponse - Skipping invalid item: \(item.description ?? "Unknown")")
+                return nil
+            }
+            
+            return Invoice.InvoiceItem(
+                id: item.item?.id ?? UUID().uuidString, // Use NetSuite item ID if available
+                description: item.description?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown Item",
+                quantity: item.validatedQuantity,
+                unitPrice: Decimal(item.validatedRate),
+                amount: Decimal(item.validatedAmount),
                 netSuiteItemId: item.item?.id
             )
         } ?? []
         
-        let status: Invoice.InvoiceStatus
-        switch self.status?.lowercased() {
-        case "paid":
-            status = .paid
-        case "overdue":
-            status = .overdue
-        case "cancelled":
-            status = .cancelled
-        default:
-            status = .pending
+        // Enhanced status mapping using enum
+        let netSuiteStatus = NetSuiteInvoiceStatus(rawValue: status)
+        let invoiceStatus: Invoice.InvoiceStatus
+        
+        switch netSuiteStatus {
+        case .paid:
+            invoiceStatus = .paid
+        case .overdue:
+            invoiceStatus = .overdue
+        case .cancelled:
+            invoiceStatus = .cancelled
+        case .pending, .draft, .approved, .closed, .unknown:
+            invoiceStatus = .pending
         }
         
+        // Enhanced amount validation
+        let validatedTotal = max(0, total ?? 0)
+        let validatedBalance = max(0, balance ?? validatedTotal)
+        
+        // Enhanced invoice number generation
+        let invoiceNumber = tranId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false 
+            ? tranId! 
+            : "INV-\(id)"
+        
+        // Enhanced customer information
+        let customerId = entity?.id ?? ""
+        let customerName = entity?.refName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown Customer"
+        
         return Invoice(
-            id: id,
-            invoiceNumber: tranId ?? "INV-\(id)",
-            customerId: entity?.id ?? "",
-            customerName: entity?.refName ?? "Unknown Customer",
-            amount: Decimal(total ?? 0),
-            balance: Decimal(balance ?? 0),
-            status: status,
+            id: id, // Use NetSuite ID directly for consistency
+            invoiceNumber: invoiceNumber,
+            customerId: customerId,
+            customerName: customerName,
+            amount: Decimal(validatedTotal),
+            balance: Decimal(validatedBalance),
+            status: invoiceStatus,
             dueDate: dueDate,
             createdDate: createdDate,
             netSuiteId: id,
             items: items,
-            notes: memo
+            notes: memo?.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+    }
+}
+
+// MARK: - Error Handling Extensions
+
+extension NetSuiteCustomerResponse {
+    /// Validates the customer response and returns any issues found
+    func validate() -> [String] {
+        var issues: [String] = []
+        
+        if id.isEmpty {
+            issues.append("Customer ID is empty")
+        }
+        
+        if [firstName, lastName, companyName].allSatisfy({ $0?.isEmpty != false }) {
+            issues.append("No customer name provided (firstName, lastName, or companyName)")
+        }
+        
+        if let email = email, !email.isEmpty {
+            // Basic email validation
+            let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+            if email.range(of: emailRegex, options: .regularExpression) == nil {
+                issues.append("Invalid email format: \(email)")
+            }
+        }
+        
+        return issues
+    }
+}
+
+extension NetSuiteInvoiceResponse {
+    /// Validates the invoice response and returns any issues found
+    func validate() -> [String] {
+        var issues: [String] = []
+        
+        if id.isEmpty {
+            issues.append("Invoice ID is empty")
+        }
+        
+        if let total = total, total < 0 {
+            issues.append("Invoice total is negative: \(total)")
+        }
+        
+        if let balance = balance, balance < 0 {
+            issues.append("Invoice balance is negative: \(balance)")
+        }
+        
+        if let itemList = itemList, let items = itemList.item {
+            for (index, item) in items.enumerated() {
+                if item.validatedQuantity <= 0 {
+                    issues.append("Item \(index + 1) has invalid quantity: \(item.quantity ?? 0)")
+                }
+                if item.validatedAmount < 0 {
+                    issues.append("Item \(index + 1) has negative amount: \(item.amount ?? 0)")
+                }
+            }
+        }
+        
+        return issues
     }
 } 

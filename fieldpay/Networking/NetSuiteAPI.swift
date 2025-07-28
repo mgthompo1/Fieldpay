@@ -6,6 +6,10 @@ class NetSuiteAPI: ObservableObject {
     
     private(set) var accessToken: String?
     private var accountId: String?
+    private var tokenExpiryDate: Date?
+    
+    // Reference to OAuthManager for token refresh
+    private var oAuthManager: OAuthManager?
     
     private var baseURL: String {
         guard let accountId = accountId, !accountId.isEmpty else {
@@ -18,14 +22,24 @@ class NetSuiteAPI: ObservableObject {
         return url
     }
     
-    private init() {}
+    private init() {
+        // Initialize OAuthManager on main actor when needed
+    }
     
     // MARK: - Configuration
     func configure(accountId: String, accessToken: String) {
         self.accountId = accountId
         self.accessToken = accessToken
+        
+        // Load token expiry from UserDefaults
+        if let expiryDate = UserDefaults.standard.object(forKey: "netsuite_token_expiry") as? Date {
+            self.tokenExpiryDate = expiryDate
+            print("Debug: NetSuiteAPI - Loaded token expiry: \(expiryDate)")
+        }
+        
         print("Debug: NetSuiteAPI configured with account ID: \(accountId)")
         print("Debug: NetSuiteAPI access token length: \(accessToken.count)")
+        print("Debug: NetSuiteAPI token expiry: \(tokenExpiryDate?.description ?? "not set")")
     }
     
     func isConfigured() -> Bool {
@@ -44,32 +58,39 @@ class NetSuiteAPI: ObservableObject {
             }
         }
         
+        // Load token expiry if not set
+        if tokenExpiryDate == nil {
+            if let storedExpiry = UserDefaults.standard.object(forKey: "netsuite_token_expiry") as? Date {
+                tokenExpiryDate = storedExpiry
+                print("Debug: NetSuiteAPI - Loaded token expiry from UserDefaults: \(storedExpiry)")
+            }
+        }
+        
         let configured = accountId != nil && !accountId!.isEmpty && accessToken != nil && !accessToken!.isEmpty
         print("Debug: NetSuiteAPI configuration status: \(configured)")
         if configured {
             print("Debug: NetSuiteAPI - Account ID: \(accountId ?? "nil")")
             print("Debug: NetSuiteAPI - Access token present: \(accessToken != nil)")
+            print("Debug: NetSuiteAPI - Token expiry: \(tokenExpiryDate?.description ?? "not set")")
         } else {
             print("Debug: NetSuiteAPI - Missing configuration:")
             print("  - Account ID: \(accountId ?? "nil")")
             print("  - Access token: \(accessToken != nil ? "present" : "missing")")
+            print("  - Token expiry: \(tokenExpiryDate?.description ?? "not set")")
         }
         return configured
     }
     
     func testConnection() async throws {
-        guard isConfigured() else {
-            throw NetSuiteError.notConfigured
-        }
+        // Validate token before making request
+        try await validateTokenBeforeRequest()
         
         // Try to fetch a single customer to test the connection
         let endpoint = "/services/rest/record/v1/customer?limit=1"
         let url = URL(string: baseURL + endpoint)!
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken!)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let request = createRequest(url: url)
+        logRequestDetails(request)
         
         print("Debug: NetSuiteAPI - Testing connection to: \(url)")
         
@@ -79,12 +100,30 @@ class NetSuiteAPI: ObservableObject {
             throw NetSuiteError.requestFailed
         }
         
-        print("Debug: NetSuiteAPI - Test connection response status: \(httpResponse.statusCode)")
+        logResponseDetails(httpResponse, data: data)
+        
+        // Handle 401 Unauthorized with automatic token refresh
+        if httpResponse.statusCode == 401 {
+            try await handle401Response()
+            // Retry the request with new token
+            let retryRequest = createRequest(url: url)
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            
+            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                throw NetSuiteError.requestFailed
+            }
+            
+            if retryHttpResponse.statusCode != 200 {
+                print("Debug: NetSuiteAPI - Retry request failed with status: \(retryHttpResponse.statusCode)")
+                throw NetSuiteError.requestFailed
+            }
+            
+            print("Debug: NetSuiteAPI - Connection test successful after token refresh")
+            return
+        }
         
         if httpResponse.statusCode != 200 {
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Debug: NetSuiteAPI - Test connection error response: \(responseString)")
-            }
+            print("Debug: NetSuiteAPI - Test connection failed with status: \(httpResponse.statusCode)")
             throw NetSuiteError.requestFailed
         }
         
@@ -93,6 +132,8 @@ class NetSuiteAPI: ObservableObject {
     
     func updateTokens(accessToken: String, refreshToken: String, expiryDate: Date) {
         self.accessToken = accessToken
+        self.tokenExpiryDate = expiryDate
+        
         // Store refresh token and expiry date for future use
         UserDefaults.standard.set(refreshToken, forKey: "netsuite_refresh_token")
         UserDefaults.standard.set(expiryDate, forKey: "netsuite_token_expiry")
@@ -108,6 +149,109 @@ class NetSuiteAPI: ObservableObject {
         print("Debug: NetSuiteAPI - updateTokens completed:")
         print("Debug: NetSuiteAPI - Account ID: \(self.accountId ?? "nil")")
         print("Debug: NetSuiteAPI - Access token present: \(self.accessToken != nil)")
+        print("Debug: NetSuiteAPI - Token expiry: \(expiryDate)")
+    }
+    
+    // MARK: - Token Validation and Refresh
+    private func isTokenExpired() -> Bool {
+        guard let expiryDate = tokenExpiryDate else {
+            print("Debug: NetSuiteAPI - No token expiry date set, assuming expired")
+            return true
+        }
+        
+        let now = Date()
+        let isExpired = now >= expiryDate
+        print("Debug: NetSuiteAPI - Token expiry check: \(expiryDate), current time: \(now), expired: \(isExpired)")
+        return isExpired
+    }
+    
+    private func validateTokenBeforeRequest() async throws {
+        guard isConfigured() else {
+            throw NetSuiteError.notConfigured
+        }
+        
+        // Check if token is expired
+        if isTokenExpired() {
+            print("Debug: NetSuiteAPI - Token expired, attempting refresh...")
+            try await refreshTokenIfNeeded()
+        }
+    }
+    
+    private func refreshTokenIfNeeded() async throws {
+        guard let refreshToken = UserDefaults.standard.string(forKey: "netsuite_refresh_token") else {
+            print("Debug: NetSuiteAPI - No refresh token available")
+            throw NetSuiteError.authenticationFailed
+        }
+        
+        print("Debug: NetSuiteAPI - Refreshing access token...")
+        
+        // Get OAuthManager on main actor
+        let oAuthManager = await MainActor.run {
+            if self.oAuthManager == nil {
+                self.oAuthManager = OAuthManager.shared
+            }
+            return self.oAuthManager!
+        }
+        
+        do {
+            let newTokens = try await oAuthManager.refreshAccessToken(refreshToken: refreshToken)
+            
+            // Update tokens in NetSuiteAPI
+            self.accessToken = newTokens.accessToken
+            self.tokenExpiryDate = newTokens.expiryDate
+            
+            // Store new tokens
+            UserDefaults.standard.set(newTokens.refreshToken, forKey: "netsuite_refresh_token")
+            UserDefaults.standard.set(newTokens.expiryDate, forKey: "netsuite_token_expiry")
+            
+            print("Debug: NetSuiteAPI - Token refresh successful")
+            print("Debug: NetSuiteAPI - New token expiry: \(newTokens.expiryDate)")
+        } catch {
+            print("Debug: NetSuiteAPI - Token refresh failed: \(error)")
+            throw NetSuiteError.authenticationFailed
+        }
+    }
+    
+    private func handle401Response() async throws {
+        print("Debug: NetSuiteAPI - Received 401 Unauthorized, attempting token refresh...")
+        try await refreshTokenIfNeeded()
+    }
+    
+    // MARK: - Helper Methods
+    private func createRequest(url: URL, method: String = "GET", body: Data? = nil) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        
+        // Set consistent headers
+        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        if method == "POST" || method == "PUT" {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        
+        if let body = body {
+            request.httpBody = body
+        }
+        
+        return request
+    }
+    
+    private func logRequestDetails(_ request: URLRequest) {
+        print("Debug: NetSuiteAPI - Request URL: \(request.url?.absoluteString ?? "nil")")
+        print("Debug: NetSuiteAPI - Request method: \(request.httpMethod ?? "nil")")
+        print("Debug: NetSuiteAPI - Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        if let body = request.httpBody, let bodyString = String(data: body, encoding: .utf8) {
+            print("Debug: NetSuiteAPI - Request body: \(bodyString)")
+        }
+    }
+    
+    private func logResponseDetails(_ response: HTTPURLResponse, data: Data) {
+        print("Debug: NetSuiteAPI - Response status: \(response.statusCode)")
+        print("Debug: NetSuiteAPI - Response headers: \(response.allHeaderFields)")
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("Debug: NetSuiteAPI - Response body: \(responseString)")
+        }
     }
     
     // MARK: - Authentication
@@ -124,22 +268,16 @@ class NetSuiteAPI: ObservableObject {
     
     // MARK: - Customers
     func fetchCustomers() async throws -> [Customer] {
-        guard let accessToken = accessToken, !accessToken.isEmpty else {
-            print("Debug: NetSuiteAPI - Access token not configured")
-            throw NetSuiteError.notConfigured
-        }
+        // Validate token before making request
+        try await validateTokenBeforeRequest()
         
         let endpoint = "/services/rest/record/v1/customer"
         let url = URL(string: baseURL + endpoint)!
         
         print("Debug: NetSuiteAPI - Fetching customers from: \(url)")
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        
-        print("Debug: NetSuiteAPI - Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        let request = createRequest(url: url)
+        logRequestDetails(request)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -148,11 +286,26 @@ class NetSuiteAPI: ObservableObject {
             throw NetSuiteError.requestFailed
         }
         
-        print("Debug: NetSuiteAPI - Response status: \(httpResponse.statusCode)")
-        print("Debug: NetSuiteAPI - Response headers: \(httpResponse.allHeaderFields)")
+        logResponseDetails(httpResponse, data: data)
         
-        if let responseString = String(data: data, encoding: .utf8) {
-            print("Debug: NetSuiteAPI - Response body: \(responseString)")
+        // Handle 401 Unauthorized with automatic token refresh
+        if httpResponse.statusCode == 401 {
+            try await handle401Response()
+            // Retry the request with new token
+            let retryRequest = createRequest(url: url)
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            
+            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                throw NetSuiteError.requestFailed
+            }
+            
+            if retryHttpResponse.statusCode != 200 {
+                print("Debug: NetSuiteAPI - Retry request failed with status: \(retryHttpResponse.statusCode)")
+                throw NetSuiteError.requestFailed
+            }
+            
+            // Parse the retry response
+            return try parseCustomerResponse(retryData)
         }
         
         guard httpResponse.statusCode == 200 else {
@@ -160,6 +313,11 @@ class NetSuiteAPI: ObservableObject {
             throw NetSuiteError.requestFailed
         }
         
+        // Parse the response
+        return try parseCustomerResponse(data)
+    }
+    
+    private func parseCustomerResponse(_ data: Data) throws -> [Customer] {
         // Parse NetSuite customer response using the proper response model
         do {
             let netSuiteResponse = try JSONDecoder().decode(NetSuiteResponse<NetSuiteCustomerResponse>.self, from: data)
@@ -183,18 +341,45 @@ class NetSuiteAPI: ObservableObject {
     }
     
     func fetchCustomer(id: String) async throws -> Customer {
+        // Validate token before making request
+        try await validateTokenBeforeRequest()
+        
         let endpoint = "/services/rest/record/v1/customer/\(id)"
         let url = URL(string: baseURL + endpoint)!
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let request = createRequest(url: url)
+        logRequestDetails(request)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetSuiteError.requestFailed
+        }
+        
+        logResponseDetails(httpResponse, data: data)
+        
+        // Handle 401 Unauthorized with automatic token refresh
+        if httpResponse.statusCode == 401 {
+            try await handle401Response()
+            // Retry the request with new token
+            let retryRequest = createRequest(url: url)
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            
+            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                throw NetSuiteError.requestFailed
+            }
+            
+            if retryHttpResponse.statusCode != 200 {
+                print("Debug: NetSuiteAPI - Retry request failed with status: \(retryHttpResponse.statusCode)")
+                throw NetSuiteError.requestFailed
+            }
+            
+            // Parse the retry response
+            let netSuiteCustomer = try JSONDecoder().decode(NetSuiteCustomerResponse.self, from: retryData)
+            return netSuiteCustomer.toCustomer()
+        }
+        
+        guard httpResponse.statusCode == 200 else {
             throw NetSuiteError.requestFailed
         }
         
@@ -204,22 +389,16 @@ class NetSuiteAPI: ObservableObject {
     
     // MARK: - Invoices
     func fetchInvoices() async throws -> [Invoice] {
-        guard let accessToken = accessToken, !accessToken.isEmpty else {
-            print("Debug: NetSuiteAPI - Access token not configured")
-            throw NetSuiteError.notConfigured
-        }
+        // Validate token before making request
+        try await validateTokenBeforeRequest()
         
         let endpoint = "/services/rest/record/v1/invoice"
         let url = URL(string: baseURL + endpoint)!
         
         print("Debug: NetSuiteAPI - Fetching invoices from: \(url)")
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        
-        print("Debug: NetSuiteAPI - Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        let request = createRequest(url: url)
+        logRequestDetails(request)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -228,11 +407,26 @@ class NetSuiteAPI: ObservableObject {
             throw NetSuiteError.requestFailed
         }
         
-        print("Debug: NetSuiteAPI - Response status: \(httpResponse.statusCode)")
-        print("Debug: NetSuiteAPI - Response headers: \(httpResponse.allHeaderFields)")
+        logResponseDetails(httpResponse, data: data)
         
-        if let responseString = String(data: data, encoding: .utf8) {
-            print("Debug: NetSuiteAPI - Response body: \(responseString)")
+        // Handle 401 Unauthorized with automatic token refresh
+        if httpResponse.statusCode == 401 {
+            try await handle401Response()
+            // Retry the request with new token
+            let retryRequest = createRequest(url: url)
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            
+            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                throw NetSuiteError.requestFailed
+            }
+            
+            if retryHttpResponse.statusCode != 200 {
+                print("Debug: NetSuiteAPI - Retry request failed with status: \(retryHttpResponse.statusCode)")
+                throw NetSuiteError.requestFailed
+            }
+            
+            // Parse the retry response
+            return try parseInvoiceResponse(retryData)
         }
         
         guard httpResponse.statusCode == 200 else {
@@ -240,6 +434,11 @@ class NetSuiteAPI: ObservableObject {
             throw NetSuiteError.requestFailed
         }
         
+        // Parse the response
+        return try parseInvoiceResponse(data)
+    }
+    
+    private func parseInvoiceResponse(_ data: Data) throws -> [Invoice] {
         // Parse NetSuite invoice response using the proper response model
         do {
             let netSuiteResponse = try JSONDecoder().decode(NetSuiteResponse<NetSuiteInvoiceResponse>.self, from: data)
@@ -263,18 +462,45 @@ class NetSuiteAPI: ObservableObject {
     }
     
     func fetchInvoice(id: String) async throws -> Invoice {
+        // Validate token before making request
+        try await validateTokenBeforeRequest()
+        
         let endpoint = "/services/rest/record/v1/invoice/\(id)"
         let url = URL(string: baseURL + endpoint)!
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let request = createRequest(url: url)
+        logRequestDetails(request)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetSuiteError.requestFailed
+        }
+        
+        logResponseDetails(httpResponse, data: data)
+        
+        // Handle 401 Unauthorized with automatic token refresh
+        if httpResponse.statusCode == 401 {
+            try await handle401Response()
+            // Retry the request with new token
+            let retryRequest = createRequest(url: url)
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            
+            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                throw NetSuiteError.requestFailed
+            }
+            
+            if retryHttpResponse.statusCode != 200 {
+                print("Debug: NetSuiteAPI - Retry request failed with status: \(retryHttpResponse.statusCode)")
+                throw NetSuiteError.requestFailed
+            }
+            
+            // Parse the retry response
+            let netSuiteInvoice = try JSONDecoder().decode(NetSuiteInvoiceResponse.self, from: retryData)
+            return netSuiteInvoice.toInvoice()
+        }
+        
+        guard httpResponse.statusCode == 200 else {
             throw NetSuiteError.requestFailed
         }
         
@@ -325,22 +551,46 @@ class NetSuiteAPI: ObservableObject {
     
     // MARK: - Payments
     func createPayment(_ payment: Payment) async throws -> Payment {
+        // Validate token before making request
+        try await validateTokenBeforeRequest()
+        
         let endpoint = "/services/rest/record/v1/customerpayment"
         let url = URL(string: baseURL + endpoint)!
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        
         let paymentData = try JSONEncoder().encode(payment)
-        request.httpBody = paymentData
+        let request = createRequest(url: url, method: "POST", body: paymentData)
+        logRequestDetails(request)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 201 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetSuiteError.requestFailed
+        }
+        
+        logResponseDetails(httpResponse, data: data)
+        
+        // Handle 401 Unauthorized with automatic token refresh
+        if httpResponse.statusCode == 401 {
+            try await handle401Response()
+            // Retry the request with new token
+            let retryRequest = createRequest(url: url, method: "POST", body: paymentData)
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            
+            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                throw NetSuiteError.requestFailed
+            }
+            
+            if retryHttpResponse.statusCode != 201 {
+                print("Debug: NetSuiteAPI - Retry request failed with status: \(retryHttpResponse.statusCode)")
+                throw NetSuiteError.requestFailed
+            }
+            
+            // Parse the retry response
+            let createdPayment = try JSONDecoder().decode(Payment.self, from: retryData)
+            return createdPayment
+        }
+        
+        guard httpResponse.statusCode == 201 else {
             throw NetSuiteError.requestFailed
         }
         
@@ -349,18 +599,45 @@ class NetSuiteAPI: ObservableObject {
     }
     
     func fetchPayments() async throws -> [Payment] {
+        // Validate token before making request
+        try await validateTokenBeforeRequest()
+        
         let endpoint = "/services/rest/record/v1/customerpayment"
         let url = URL(string: baseURL + endpoint)!
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let request = createRequest(url: url)
+        logRequestDetails(request)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetSuiteError.requestFailed
+        }
+        
+        logResponseDetails(httpResponse, data: data)
+        
+        // Handle 401 Unauthorized with automatic token refresh
+        if httpResponse.statusCode == 401 {
+            try await handle401Response()
+            // Retry the request with new token
+            let retryRequest = createRequest(url: url)
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            
+            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                throw NetSuiteError.requestFailed
+            }
+            
+            if retryHttpResponse.statusCode != 200 {
+                print("Debug: NetSuiteAPI - Retry request failed with status: \(retryHttpResponse.statusCode)")
+                throw NetSuiteError.requestFailed
+            }
+            
+            // Parse the retry response
+            let payments = try JSONDecoder().decode([Payment].self, from: retryData)
+            return payments
+        }
+        
+        guard httpResponse.statusCode == 200 else {
             throw NetSuiteError.requestFailed
         }
         
@@ -388,4 +665,4 @@ enum NetSuiteError: Error, LocalizedError {
             return "NetSuite authentication failed."
         }
     }
-} 
+}

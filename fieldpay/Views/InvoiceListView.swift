@@ -1,33 +1,65 @@
 import SwiftUI
 
+// MARK: - Currency Formatter
+struct CurrencyFormatter {
+    static let shared = CurrencyFormatter()
+    
+    private let formatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter
+    }()
+    
+    func format(_ amount: Decimal) -> String {
+        return formatter.string(from: NSDecimalNumber(decimal: amount)) ?? "$0.00"
+    }
+}
+
 struct InvoiceListView: View {
     @ObservedObject var viewModel: InvoiceViewModel
     @State private var searchText = ""
     @State private var selectedStatus: Invoice.InvoiceStatus?
     @State private var showingAddInvoice = false
+    @State private var debouncedSearchText = ""
     
     var body: some View {
         NavigationView {
             VStack {
                 if viewModel.isLoading {
-                    ProgressView("Loading invoices...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let errorMessage = viewModel.errorMessage {
-                    VStack {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.largeTitle)
-                            .foregroundColor(.orange)
-                        Text("Error")
-                            .font(.headline)
-                        Text(errorMessage)
+                    VStack(spacing: 16) {
+                        ProgressView("Loading invoices...")
+                            .scaleEffect(1.2)
+                        Text("Please wait while we fetch your invoices")
                             .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground))
+                    .allowsHitTesting(false)
+                } else if let errorMessage = viewModel.errorMessage {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 48))
+                            .foregroundColor(.orange)
+                        Text("Unable to Load Invoices")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        Text(errorMessage)
+                            .font(.body)
+                            .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
-                        Button("Retry") {
+                            .padding(.horizontal)
+                        Button("Try Again") {
                             viewModel.loadInvoices()
                         }
                         .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground))
                 } else {
                     List {
                         ForEach(filteredInvoices) { invoice in
@@ -37,9 +69,48 @@ struct InvoiceListView: View {
                         }
                     }
                     .searchable(text: $searchText, prompt: "Search invoices")
+                    .accessibilityLabel("Search invoices by number or customer name")
                     .onChange(of: searchText) { _, newValue in
-                        viewModel.searchInvoices(query: newValue)
+                        // Debounce search to avoid excessive API calls
+                        Task {
+                            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                            if searchText == newValue {
+                                await MainActor.run {
+                                    debouncedSearchText = newValue
+                                    viewModel.searchInvoices(query: newValue)
+                                }
+                            }
+                        }
                     }
+                    .overlay {
+                        if filteredInvoices.isEmpty && !searchText.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.secondary)
+                                Text("No invoices found")
+                                    .font(.headline)
+                                Text("Try adjusting your search terms")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if filteredInvoices.isEmpty && selectedStatus != nil {
+                            VStack(spacing: 12) {
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.secondary)
+                                Text("No \(selectedStatus?.displayName.lowercased() ?? "") invoices")
+                                    .font(.headline)
+                                Text("Try selecting a different status")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
+                    // Performance optimization for large lists
+                    .environment(\.defaultMinListRowHeight, 80)
                 }
             }
             .navigationTitle("Invoices")
@@ -49,12 +120,14 @@ struct InvoiceListView: View {
                     Button(action: { showingAddInvoice = true }) {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("Add new invoice")
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { viewModel.loadInvoices() }) {
                         Image(systemName: "arrow.clockwise")
                     }
+                    .accessibilityLabel("Refresh invoices")
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -70,6 +143,7 @@ struct InvoiceListView: View {
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                     }
+                    .accessibilityLabel("Filter invoices by status")
                 }
             }
             .sheet(isPresented: $showingAddInvoice) {
@@ -85,10 +159,10 @@ struct InvoiceListView: View {
             invoices = invoices.filter { $0.status == selectedStatus }
         }
         
-        if !searchText.isEmpty {
+        if !debouncedSearchText.isEmpty {
             invoices = invoices.filter { invoice in
-                invoice.invoiceNumber.localizedCaseInsensitiveContains(searchText) ||
-                invoice.customerName.localizedCaseInsensitiveContains(searchText)
+                invoice.invoiceNumber.localizedCaseInsensitiveContains(debouncedSearchText) ||
+                invoice.customerName.localizedCaseInsensitiveContains(debouncedSearchText)
             }
         }
         
@@ -106,27 +180,32 @@ struct InvoiceRowView: View {
                     Text(invoice.invoiceNumber)
                         .font(.headline)
                         .foregroundColor(.primary)
+                        .accessibilityLabel("Invoice number")
                     
                     Text(invoice.customerName)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .accessibilityLabel("Customer name")
                 }
                 
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(String(format: "$%.2f", (invoice.amount as NSDecimalNumber).doubleValue))
+                    Text(CurrencyFormatter.shared.format((invoice.amount as NSDecimalNumber).decimalValue))
                         .font(.headline)
                         .foregroundColor(.primary)
+                        .accessibilityLabel("Invoice amount")
                     
-                    Text("Balance: \(String(format: "$%.2f", (invoice.balance as NSDecimalNumber).doubleValue))")
+                    Text("Balance: \(CurrencyFormatter.shared.format((invoice.balance as NSDecimalNumber).decimalValue))")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .accessibilityLabel("Balance due")
                 }
             }
             
             HStack {
                 StatusBadge(status: invoice.status)
+                    .accessibilityLabel("Invoice status: \(invoice.status.displayName)")
                 
                 Spacer()
                 
@@ -134,10 +213,13 @@ struct InvoiceRowView: View {
                     Text("Due: \(dueDate, style: .date)")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .accessibilityLabel("Due date")
                 }
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Invoice \(invoice.invoiceNumber) for \(invoice.customerName), amount \(CurrencyFormatter.shared.format((invoice.amount as NSDecimalNumber).decimalValue)), status \(invoice.status.displayName)")
     }
 }
 
@@ -198,7 +280,7 @@ struct InvoiceDetailView: View {
                             Text("Total Amount:")
                                 .fontWeight(.medium)
                             Spacer()
-                            Text(String(format: "$%.2f", (invoice.amount as NSDecimalNumber).doubleValue))
+                            Text(CurrencyFormatter.shared.format((invoice.amount as NSDecimalNumber).decimalValue))
                                 .fontWeight(.bold)
                         }
                         
@@ -206,7 +288,7 @@ struct InvoiceDetailView: View {
                             Text("Balance Due:")
                                 .fontWeight(.medium)
                             Spacer()
-                            Text(String(format: "$%.2f", (invoice.balance as NSDecimalNumber).doubleValue))
+                            Text(CurrencyFormatter.shared.format((invoice.balance as NSDecimalNumber).decimalValue))
                                 .fontWeight(.bold)
                                 .foregroundColor(invoice.balance > 0 ? .red : .green)
                         }
@@ -347,14 +429,14 @@ struct InvoiceItemRow: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                Text("Qty: \(String(format: "%.0f", item.quantity)) × \(String(format: "$%.2f", (item.unitPrice as NSDecimalNumber).doubleValue))")
+                Text("Qty: \(String(format: "%.0f", item.quantity)) × \(CurrencyFormatter.shared.format((item.unitPrice as NSDecimalNumber).decimalValue))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
             Spacer()
             
-            Text(String(format: "$%.2f", (item.amount as NSDecimalNumber).doubleValue))
+            Text(CurrencyFormatter.shared.format((item.amount as NSDecimalNumber).decimalValue))
                 .font(.subheadline)
                 .fontWeight(.medium)
         }
@@ -372,18 +454,41 @@ struct AddInvoiceView: View {
     @State private var dueDate = Date()
     @State private var notes = ""
     @State private var items: [Invoice.InvoiceItem] = []
+    @State private var showingAmountError = false
+    @State private var isSaving = false
+    
+    private var isValidAmount: Bool {
+        guard !amount.isEmpty else { return false }
+        return Decimal(string: amount) != nil
+    }
+    
+    private var canSave: Bool {
+        !customerName.isEmpty && !amount.isEmpty && isValidAmount && !isSaving
+    }
     
     var body: some View {
         NavigationView {
             Form {
                 Section("Customer Information") {
                     TextField("Customer Name", text: $customerName)
+                        .textContentType(.name)
                     TextField("Customer ID", text: $customerId)
+                        .textContentType(.none)
                 }
                 
                 Section("Invoice Details") {
                     TextField("Amount", text: $amount)
                         .keyboardType(.decimalPad)
+                        .onChange(of: amount) { _, newValue in
+                            showingAmountError = false
+                        }
+                    
+                    if showingAmountError {
+                        Text("Please enter a valid amount")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    
                     DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
                 }
                 
@@ -399,24 +504,53 @@ struct AddInvoiceView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .disabled(isSaving)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        guard let amountValue = Decimal(string: amount) else { return }
-                        
-                        viewModel.createInvoice(
-                            customerId: customerId,
-                            customerName: customerName,
-                            amount: amountValue,
-                            items: items,
-                            dueDate: dueDate
-                        )
-                        dismiss()
+                        createInvoice()
                     }
-                    .disabled(customerName.isEmpty || amount.isEmpty)
+                    .disabled(!canSave)
                 }
             }
+            .overlay {
+                if isSaving {
+                    VStack {
+                        ProgressView("Creating invoice...")
+                            .scaleEffect(1.2)
+                        Text("Please wait")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground).opacity(0.8))
+                    .allowsHitTesting(false)
+                }
+            }
+        }
+    }
+    
+    private func createInvoice() {
+        guard let amountValue = Decimal(string: amount) else {
+            showingAmountError = true
+            return
+        }
+        
+        isSaving = true
+        
+        viewModel.createInvoice(
+            customerId: customerId,
+            customerName: customerName,
+            amount: amountValue,
+            items: items,
+            dueDate: dueDate
+        )
+        
+        // Simulate a brief delay to show the saving state
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            isSaving = false
+            dismiss()
         }
     }
 }
@@ -430,6 +564,17 @@ struct EditInvoiceView: View {
     @State private var amount: String
     @State private var dueDate: Date
     @State private var notes: String
+    @State private var showingAmountError = false
+    @State private var isSaving = false
+    
+    private var isValidAmount: Bool {
+        guard !amount.isEmpty else { return false }
+        return Decimal(string: amount) != nil
+    }
+    
+    private var canSave: Bool {
+        !customerName.isEmpty && !amount.isEmpty && isValidAmount && !isSaving
+    }
     
     init(invoice: Invoice, viewModel: InvoiceViewModel) {
         self.invoice = invoice
@@ -446,11 +591,22 @@ struct EditInvoiceView: View {
             Form {
                 Section("Customer Information") {
                     TextField("Customer Name", text: $customerName)
+                        .textContentType(.name)
                 }
                 
                 Section("Invoice Details") {
                     TextField("Amount", text: $amount)
                         .keyboardType(.decimalPad)
+                        .onChange(of: amount) { _, newValue in
+                            showingAmountError = false
+                        }
+                    
+                    if showingAmountError {
+                        Text("Please enter a valid amount")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    
                     DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
                 }
                 
@@ -466,33 +622,62 @@ struct EditInvoiceView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .disabled(isSaving)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        guard let amountValue = Decimal(string: amount) else { return }
-                        
-                        let updatedInvoice = Invoice(
-                            id: invoice.id,
-                            invoiceNumber: invoice.invoiceNumber,
-                            customerId: invoice.customerId,
-                            customerName: customerName,
-                            amount: amountValue,
-                            balance: invoice.balance,
-                            status: invoice.status,
-                            dueDate: dueDate,
-                            createdDate: invoice.createdDate,
-                            netSuiteId: invoice.netSuiteId,
-                            items: invoice.items,
-                            notes: notes.isEmpty ? nil : notes
-                        )
-                        
-                        viewModel.updateInvoice(updatedInvoice)
-                        dismiss()
+                        updateInvoice()
                     }
-                    .disabled(customerName.isEmpty || amount.isEmpty)
+                    .disabled(!canSave)
                 }
             }
+            .overlay {
+                if isSaving {
+                    VStack {
+                        ProgressView("Updating invoice...")
+                            .scaleEffect(1.2)
+                        Text("Please wait")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground).opacity(0.8))
+                    .allowsHitTesting(false)
+                }
+            }
+        }
+    }
+    
+    private func updateInvoice() {
+        guard let amountValue = Decimal(string: amount) else {
+            showingAmountError = true
+            return
+        }
+        
+        isSaving = true
+        
+        let updatedInvoice = Invoice(
+            id: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            customerId: invoice.customerId,
+            customerName: customerName,
+            amount: amountValue,
+            balance: invoice.balance,
+            status: invoice.status,
+            dueDate: dueDate,
+            createdDate: invoice.createdDate,
+            netSuiteId: invoice.netSuiteId,
+            items: invoice.items,
+            notes: notes.isEmpty ? nil : notes
+        )
+        
+        viewModel.updateInvoice(updatedInvoice)
+        
+        // Simulate a brief delay to show the saving state
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            isSaving = false
+            dismiss()
         }
     }
 } 

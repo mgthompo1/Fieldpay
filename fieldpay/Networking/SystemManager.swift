@@ -2,6 +2,26 @@ import Foundation
 import Combine
 import SwiftUI
 
+enum TokenHealthStatus {
+    case healthy
+    case expired
+    case notAuthenticated
+    case noSystem
+    
+    var description: String {
+        switch self {
+        case .healthy:
+            return "Token is valid"
+        case .expired:
+            return "Token has expired"
+        case .notAuthenticated:
+            return "System not authenticated"
+        case .noSystem:
+            return "No system connected"
+        }
+    }
+}
+
 enum AccountingSystem: String, CaseIterable {
     case none = "none"
     case netsuite = "netsuite"
@@ -56,13 +76,17 @@ class SystemManager: ObservableObject {
     
     private init() {
         loadCurrentSystem()
-        updateConnectionStatus()
+        // Note: updateConnectionStatus() will be called after state recovery
+        // We'll call validateAndRecoverSystemState() from the app's main entry point
     }
     
     // MARK: - System Management
     func connectToSystem(_ system: AccountingSystem) async throws {
         print("Debug: SystemManager - connectToSystem called for: \(system.displayName)")
         print("Debug: SystemManager - current system: \(currentSystem.displayName)")
+        
+        // Update status to show connection attempt
+        connectionStatus = "Connecting to \(system.displayName)..."
         
         // Only disconnect if we're switching to a different system
         if currentSystem != system {
@@ -72,32 +96,45 @@ class SystemManager: ObservableObject {
             print("Debug: SystemManager - Already connected to \(system.displayName), skipping disconnect")
         }
         
-        switch system {
-        case .netsuite:
-            print("Debug: SystemManager - Connecting to NetSuite...")
-            try await connectToNetSuite()
-        case .xero:
-            print("Debug: SystemManager - Connecting to Xero...")
-            try await connectToXero()
-        case .quickbooks:
-            print("Debug: SystemManager - Connecting to QuickBooks...")
-            try await connectToQuickBooks()
-        case .salesforce:
-            print("Debug: SystemManager - Connecting to Salesforce...")
-            try await connectToSalesforce()
-        case .none:
-            print("Debug: SystemManager - Setting standalone mode...")
-            await setStandaloneMode()
+        do {
+            switch system {
+            case .netsuite:
+                print("Debug: SystemManager - Connecting to NetSuite...")
+                try await connectToNetSuite()
+            case .xero:
+                print("Debug: SystemManager - Connecting to Xero...")
+                try await connectToXero()
+            case .quickbooks:
+                print("Debug: SystemManager - Connecting to QuickBooks...")
+                try await connectToQuickBooks()
+            case .salesforce:
+                print("Debug: SystemManager - Connecting to Salesforce...")
+                try await connectToSalesforce()
+            case .none:
+                print("Debug: SystemManager - Setting standalone mode...")
+                await setStandaloneMode()
+            }
+            
+            currentSystem = system
+            userDefaults.set(system.rawValue, forKey: "current_accounting_system")
+            updateConnectionStatus()
+            print("Debug: SystemManager - Successfully connected to \(system.displayName)")
+            
+        } catch {
+            // Update status to show connection failure
+            connectionStatus = "Failed to connect to \(system.displayName)"
+            isConnected = false
+            print("Debug: SystemManager - ERROR: Failed to connect to \(system.displayName): \(error)")
+            throw error
         }
-        
-        currentSystem = system
-        userDefaults.set(system.rawValue, forKey: "current_accounting_system")
-        updateConnectionStatus()
-        print("Debug: SystemManager - Successfully connected to \(system.displayName)")
     }
     
     func disconnectFromCurrentSystem() async {
         print("Debug: SystemManager - disconnectFromCurrentSystem called for: \(currentSystem.displayName)")
+        
+        // Store the current system before disconnecting for potential recovery
+        let previousSystem = currentSystem
+        userDefaults.set(previousSystem.rawValue, forKey: "previous_accounting_system")
         
         switch currentSystem {
         case .netsuite:
@@ -123,6 +160,37 @@ class SystemManager: ObservableObject {
         print("Debug: SystemManager - Successfully disconnected from system")
     }
     
+    // MARK: - State Recovery & Validation
+    func validateAndRecoverSystemState() async {
+        print("Debug: SystemManager - validateAndRecoverSystemState called")
+        
+        // Check if we have a stored system and if it's still valid
+        let storedSystem = userDefaults.string(forKey: "current_accounting_system") ?? "none"
+        let system = AccountingSystem(rawValue: storedSystem) ?? .none
+        
+        if system != .none {
+            print("Debug: SystemManager - Found stored system: \(system.displayName)")
+            
+            // Check if the system is still authenticated
+            let canConnect = canConnectToSystem(system)
+            if canConnect {
+                print("Debug: SystemManager - Stored system is still valid, attempting to reconnect")
+                do {
+                    try await connectToSystem(system)
+                } catch {
+                    print("Debug: SystemManager - Failed to reconnect to stored system: \(error)")
+                    // Fall back to standalone mode
+                    await disconnectFromCurrentSystem()
+                }
+            } else {
+                print("Debug: SystemManager - Stored system is no longer valid, switching to standalone mode")
+                await disconnectFromCurrentSystem()
+            }
+        } else {
+            print("Debug: SystemManager - No stored system found, staying in standalone mode")
+        }
+    }
+    
     private func connectToNetSuite() async throws {
         print("Debug: SystemManager - connectToNetSuite called")
         print("Debug: SystemManager - OAuthManager.isAuthenticated: \(oAuthManager.isAuthenticated)")
@@ -130,6 +198,15 @@ class SystemManager: ObservableObject {
         guard oAuthManager.isAuthenticated else {
             print("Debug: SystemManager - ERROR: NetSuite not authenticated")
             throw SystemManagerError.notAuthenticated
+        }
+        
+        // Validate token and refresh if needed
+        do {
+            let _ = try await oAuthManager.getValidAccessToken()
+            print("Debug: SystemManager - NetSuite token validated successfully")
+        } catch {
+            print("Debug: SystemManager - ERROR: NetSuite token validation failed: \(error)")
+            throw SystemManagerError.tokenValidationFailed
         }
         
         print("Debug: SystemManager - NetSuite authentication confirmed, setting connected = true")
@@ -140,6 +217,16 @@ class SystemManager: ObservableObject {
         guard xeroOAuthManager.isAuthenticated else {
             throw SystemManagerError.notAuthenticated
         }
+        
+        // Validate token and refresh if needed
+        do {
+            let _ = try await xeroOAuthManager.getValidAccessToken()
+            print("Debug: SystemManager - Xero token validated successfully")
+        } catch {
+            print("Debug: SystemManager - ERROR: Xero token validation failed: \(error)")
+            throw SystemManagerError.tokenValidationFailed
+        }
+        
         isConnected = true
     }
     
@@ -147,6 +234,16 @@ class SystemManager: ObservableObject {
         guard quickBooksOAuthManager.isAuthenticated else {
             throw SystemManagerError.notAuthenticated
         }
+        
+        // Validate token and refresh if needed
+        do {
+            let _ = try await quickBooksOAuthManager.getValidAccessToken()
+            print("Debug: SystemManager - QuickBooks token validated successfully")
+        } catch {
+            print("Debug: SystemManager - ERROR: QuickBooks token validation failed: \(error)")
+            throw SystemManagerError.tokenValidationFailed
+        }
+        
         isConnected = true
     }
     
@@ -154,6 +251,16 @@ class SystemManager: ObservableObject {
         guard salesforceOAuthManager.isAuthenticated else {
             throw SystemManagerError.notAuthenticated
         }
+        
+        // Validate token and refresh if needed
+        do {
+            let _ = try await salesforceOAuthManager.getValidAccessToken()
+            print("Debug: SystemManager - Salesforce token validated successfully")
+        } catch {
+            print("Debug: SystemManager - ERROR: Salesforce token validation failed: \(error)")
+            throw SystemManagerError.tokenValidationFailed
+        }
+        
         isConnected = true
     }
     
@@ -178,23 +285,92 @@ class SystemManager: ObservableObject {
             print("Debug: SystemManager - Set to standalone mode")
         case .netsuite:
             let isAuth = oAuthManager.isAuthenticated
-            connectionStatus = isAuth ? "Connected to NetSuite" : "NetSuite Not Authenticated"
-            isConnected = isAuth
+            if isAuth {
+                // Check if we can get a valid token
+                Task {
+                    do {
+                        let _ = try await oAuthManager.getValidAccessToken()
+                        await MainActor.run {
+                            connectionStatus = "Connected to NetSuite"
+                            isConnected = true
+                        }
+                    } catch {
+                        await MainActor.run {
+                            connectionStatus = "NetSuite Token Expired"
+                            isConnected = false
+                        }
+                    }
+                }
+            } else {
+                connectionStatus = "NetSuite Not Authenticated"
+                isConnected = false
+            }
             print("Debug: SystemManager - NetSuite status: \(connectionStatus), isConnected: \(isConnected)")
         case .xero:
             let isAuth = xeroOAuthManager.isAuthenticated
-            connectionStatus = isAuth ? "Connected to Xero" : "Xero Not Authenticated"
-            isConnected = isAuth
+            if isAuth {
+                Task {
+                    do {
+                        let _ = try await xeroOAuthManager.getValidAccessToken()
+                        await MainActor.run {
+                            connectionStatus = "Connected to Xero"
+                            isConnected = true
+                        }
+                    } catch {
+                        await MainActor.run {
+                            connectionStatus = "Xero Token Expired"
+                            isConnected = false
+                        }
+                    }
+                }
+            } else {
+                connectionStatus = "Xero Not Authenticated"
+                isConnected = false
+            }
             print("Debug: SystemManager - Xero status: \(connectionStatus), isConnected: \(isConnected)")
         case .quickbooks:
             let isAuth = quickBooksOAuthManager.isAuthenticated
-            connectionStatus = isAuth ? "Connected to QuickBooks" : "QuickBooks Not Authenticated"
-            isConnected = isAuth
+            if isAuth {
+                Task {
+                    do {
+                        let _ = try await quickBooksOAuthManager.getValidAccessToken()
+                        await MainActor.run {
+                            connectionStatus = "Connected to QuickBooks"
+                            isConnected = true
+                        }
+                    } catch {
+                        await MainActor.run {
+                            connectionStatus = "QuickBooks Token Expired"
+                            isConnected = false
+                        }
+                    }
+                }
+            } else {
+                connectionStatus = "QuickBooks Not Authenticated"
+                isConnected = false
+            }
             print("Debug: SystemManager - QuickBooks status: \(connectionStatus), isConnected: \(isConnected)")
         case .salesforce:
             let isAuth = salesforceOAuthManager.isAuthenticated
-            connectionStatus = isAuth ? "Connected to Salesforce" : "Salesforce Not Authenticated"
-            isConnected = isAuth
+            if isAuth {
+                Task {
+                    do {
+                        let _ = try await salesforceOAuthManager.getValidAccessToken()
+                        await MainActor.run {
+                            connectionStatus = "Connected to Salesforce"
+                            isConnected = true
+                        }
+                    } catch {
+                        await MainActor.run {
+                            connectionStatus = "Salesforce Token Expired"
+                            isConnected = false
+                        }
+                    }
+                }
+            } else {
+                connectionStatus = "Salesforce Not Authenticated"
+                isConnected = false
+            }
             print("Debug: SystemManager - Salesforce status: \(connectionStatus), isConnected: \(isConnected)")
         }
     }
@@ -221,6 +397,95 @@ class SystemManager: ObservableObject {
         case .none:
             return true
         }
+    }
+    
+    // MARK: - Token Health & Validation
+    func checkTokenHealth() async -> TokenHealthStatus {
+        print("Debug: SystemManager - checkTokenHealth called for: \(currentSystem.displayName)")
+        
+        switch currentSystem {
+        case .none:
+            return .noSystem
+        case .netsuite:
+            return await checkNetSuiteTokenHealth()
+        case .xero:
+            return await checkXeroTokenHealth()
+        case .quickbooks:
+            return await checkQuickBooksTokenHealth()
+        case .salesforce:
+            return await checkSalesforceTokenHealth()
+        }
+    }
+    
+    private func checkNetSuiteTokenHealth() async -> TokenHealthStatus {
+        guard oAuthManager.isAuthenticated else {
+            return .notAuthenticated
+        }
+        
+        do {
+            let _ = try await oAuthManager.getValidAccessToken()
+            return .healthy
+        } catch {
+            return .expired
+        }
+    }
+    
+    private func checkXeroTokenHealth() async -> TokenHealthStatus {
+        guard xeroOAuthManager.isAuthenticated else {
+            return .notAuthenticated
+        }
+        
+        do {
+            let _ = try await xeroOAuthManager.getValidAccessToken()
+            return .healthy
+        } catch {
+            return .expired
+        }
+    }
+    
+    private func checkQuickBooksTokenHealth() async -> TokenHealthStatus {
+        guard quickBooksOAuthManager.isAuthenticated else {
+            return .notAuthenticated
+        }
+        
+        do {
+            let _ = try await quickBooksOAuthManager.getValidAccessToken()
+            return .healthy
+        } catch {
+            return .expired
+        }
+    }
+    
+    private func checkSalesforceTokenHealth() async -> TokenHealthStatus {
+        guard salesforceOAuthManager.isAuthenticated else {
+            return .notAuthenticated
+        }
+        
+        do {
+            let _ = try await salesforceOAuthManager.getValidAccessToken()
+            return .healthy
+        } catch {
+            return .expired
+        }
+    }
+    
+    func refreshCurrentSystemToken() async throws {
+        print("Debug: SystemManager - refreshCurrentSystemToken called for: \(currentSystem.displayName)")
+        
+        switch currentSystem {
+        case .none:
+            throw SystemManagerError.noSystemConnected
+        case .netsuite:
+            let _ = try await oAuthManager.getValidAccessToken()
+        case .xero:
+            let _ = try await xeroOAuthManager.getValidAccessToken()
+        case .quickbooks:
+            let _ = try await quickBooksOAuthManager.getValidAccessToken()
+        case .salesforce:
+            let _ = try await salesforceOAuthManager.getValidAccessToken()
+        }
+        
+        print("Debug: SystemManager - Token refresh successful for \(currentSystem.displayName)")
     }
     
     // MARK: - API Access
@@ -260,6 +525,7 @@ enum SystemManagerError: Error, LocalizedError {
     case notAuthenticated
     case noSystemConnected
     case systemNotSupported
+    case tokenValidationFailed
     
     var errorDescription: String? {
         switch self {
@@ -269,6 +535,8 @@ enum SystemManagerError: Error, LocalizedError {
             return "No accounting system connected. Running in standalone mode."
         case .systemNotSupported:
             return "This accounting system is not supported."
+        case .tokenValidationFailed:
+            return "Token validation failed. Please re-authenticate the system."
         }
     }
 } 
