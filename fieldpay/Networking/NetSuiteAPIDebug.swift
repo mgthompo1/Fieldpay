@@ -90,6 +90,87 @@ class NetSuiteAPIDebug: ObservableObject {
         print("🟢 DEBUG: NetSuiteAPI - Connection test successful")
     }
     
+    // MARK: - Data Status Methods
+    func getCustomerCount() async throws -> Int {
+        guard isConfigured() else {
+            print("🔴 DEBUG: NetSuiteAPI - Not configured for customer count")
+            throw NetSuiteError.notConfigured
+        }
+        
+        let endpoint = "/services/rest/record/v1/customer?limit=1"
+        let url = URL(string: baseURL + endpoint)!
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(accessToken!)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        print("🔍 DEBUG: NetSuiteAPI - Getting customer count from: \(url)")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("🔴 DEBUG: NetSuiteAPI - Invalid response type for customer count")
+            throw NetSuiteError.requestFailed
+        }
+        
+        if httpResponse.statusCode != 200 {
+            print("🔴 DEBUG: NetSuiteAPI - Customer count request failed with status: \(httpResponse.statusCode)")
+            throw NetSuiteError.requestFailed
+        }
+        
+        // Parse the response to get total count
+        do {
+            let netSuiteResponse = try JSONDecoder().decode(NetSuiteResponse<NetSuiteCustomerResponse>.self, from: data)
+            let totalCount = netSuiteResponse.totalResults
+            print("🟢 DEBUG: NetSuiteAPI - Customer count: \(totalCount)")
+            return totalCount
+        } catch {
+            print("🔴 DEBUG: NetSuiteAPI - Failed to parse customer count response: \(error)")
+            throw NetSuiteError.invalidResponse
+        }
+    }
+    
+    func getInvoiceCount() async throws -> Int {
+        guard isConfigured() else {
+            print("🔴 DEBUG: NetSuiteAPI - Not configured for invoice count")
+            throw NetSuiteError.notConfigured
+        }
+        
+        let endpoint = "/services/rest/record/v1/invoice?limit=1"
+        let url = URL(string: baseURL + endpoint)!
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(accessToken!)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        print("🔍 DEBUG: NetSuiteAPI - Getting invoice count from: \(url)")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("🔴 DEBUG: NetSuiteAPI - Invalid response type for invoice count")
+            throw NetSuiteError.requestFailed
+        }
+        
+        if httpResponse.statusCode != 200 {
+            print("🔴 DEBUG: NetSuiteAPI - Invoice count request failed with status: \(httpResponse.statusCode)")
+            throw NetSuiteError.requestFailed
+        }
+        
+        // Parse the response to get total count
+        do {
+            let netSuiteResponse = try JSONDecoder().decode(NetSuiteResponse<NetSuiteInvoiceResponse>.self, from: data)
+            let totalCount = netSuiteResponse.totalResults
+            print("🟢 DEBUG: NetSuiteAPI - Invoice count: \(totalCount)")
+            return totalCount
+        } catch {
+            print("🔴 DEBUG: NetSuiteAPI - Failed to parse invoice count response: \(error)")
+            throw NetSuiteError.invalidResponse
+        }
+    }
+    
     // MARK: - Customers
     func fetchCustomers() async throws -> [Customer] {
         guard let accessToken = accessToken, !accessToken.isEmpty else {

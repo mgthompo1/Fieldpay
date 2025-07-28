@@ -100,6 +100,11 @@ struct NetSuiteDebugView: View {
                                 action: { performAPITest("oauth_url", generateOAuthURL) }
                             )
                             DebugButton(
+                                title: "Check Data Status",
+                                isLoading: isLoading && loadingTask == "data_status",
+                                action: { performAPITest("data_status", checkDataStatus) }
+                            )
+                            DebugButton(
                                 title: "Clear Debug Output",
                                 isLoading: false,
                                 action: clearDebugOutput
@@ -327,6 +332,19 @@ struct NetSuiteDebugView: View {
                 alertMessage = "Failed to generate authorization URL"
                 showingAlert = true
             }
+        }
+    }
+    
+    private func checkDataStatus() async throws {
+        log("🔍 Checking NetSuite data status...")
+        let customerCount = try await netSuiteAPIDebug.getCustomerCount()
+        let invoiceCount = try await netSuiteAPIDebug.getInvoiceCount()
+        log("✅ NetSuite Data Status:")
+        log("  • Customers: \(customerCount)")
+        log("  • Invoices: \(invoiceCount)")
+        await MainActor.run {
+            alertMessage = "NetSuite Data Status checked. Customers: \(customerCount), Invoices: \(invoiceCount)"
+            showingAlert = true
         }
     }
     
