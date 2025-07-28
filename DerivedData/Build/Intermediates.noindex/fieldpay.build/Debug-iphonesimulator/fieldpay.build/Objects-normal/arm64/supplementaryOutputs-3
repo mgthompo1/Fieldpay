@@ -1,0 +1,24 @@
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Models/Customer.swift":
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.dia"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.swiftdeps"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.d"
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.swiftconstvalues"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.o"
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SystemSelectionView.swift":
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.d"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.o"
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.swiftconstvalues"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.swiftdeps"
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.dia"
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/QuickBooksSettingsView.swift":
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.swiftconstvalues"
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.dia"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.o"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.d"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.swiftdeps"
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Networking/SalesforceOAuthManager.swift":
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.dia"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.o"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.d"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.swiftdeps"
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.swiftconstvalues"

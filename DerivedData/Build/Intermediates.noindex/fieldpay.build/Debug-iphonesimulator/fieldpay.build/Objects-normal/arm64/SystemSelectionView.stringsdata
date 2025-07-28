@@ -1,0 +1,120 @@
+{
+  "source": "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SystemSelectionView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "System Selection",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 104
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select Accounting System",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 10
+        }
+      },
+      {
+        "comment": "",
+        "key": "Current Connection",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 50
+        }
+      },
+      {
+        "comment": "",
+        "key": "System Information",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 74
+        }
+      },
+      {
+        "comment": "",
+        "key": "Run without external accounting system",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 26
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ready to connect",
+        "location": {
+          "startingColumn": 93,
+          "startingLine": 30
+        }
+      },
+      {
+        "comment": "",
+        "key": "Not configured",
+        "location": {
+          "startingColumn": 114,
+          "startingLine": 30
+        }
+      },
+      {
+        "comment": "",
+        "key": "Disconnect",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Only one accounting system can be connected at a time",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "• All core functions work in standalone mode",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 77
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Configure OAuth settings before connecting",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 78
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Disconnect current system to switch to another",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 79
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connecting...",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 90
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 107
+        }
+      }
+    ]
+  },
+  "version": 1
+}

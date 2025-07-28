@@ -1,0 +1,24 @@
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SettingsView.swift":
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.swiftdeps"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.o"
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.swiftconstvalues"
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.dia"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.d"
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SalesforceSettingsView.swift":
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.dia"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.o"
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.swiftconstvalues"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.swiftdeps"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.d"
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Models/Payment.swift":
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.dia"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.swiftdeps"
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.swiftconstvalues"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.d"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.o"
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SharedComponents.swift":
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.swiftconstvalues"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.o"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.swiftdeps"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.d"
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.dia"

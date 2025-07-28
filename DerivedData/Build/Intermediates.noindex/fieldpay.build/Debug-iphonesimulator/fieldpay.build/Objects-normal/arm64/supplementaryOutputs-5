@@ -1,0 +1,24 @@
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/ViewModels/PaymentViewModel.swift":
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.o"
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.swiftconstvalues"
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.dia"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.swiftdeps"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.d"
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/ReportsView.swift":
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.o"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.d"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.swiftdeps"
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.dia"
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.swiftconstvalues"
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/ViewModels/SettingsViewModel.swift":
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.swiftconstvalues"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.o"
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.dia"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.swiftdeps"
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.d"
+"/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/PaymentView.swift":
+  dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.d"
+  diagnostics: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.dia"
+  object: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.o"
+  const-values: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.swiftconstvalues"
+  swift-dependencies: "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.swiftdeps"

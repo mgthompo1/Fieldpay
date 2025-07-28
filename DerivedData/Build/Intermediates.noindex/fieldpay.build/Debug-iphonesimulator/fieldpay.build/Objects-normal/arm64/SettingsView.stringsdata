@@ -1,0 +1,752 @@
+{
+  "source": "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 275
+        }
+      },
+      {
+        "comment": "",
+        "key": "Payment Configuration",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 16
+        }
+      },
+      {
+        "comment": "",
+        "key": "Accounting System Integration",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 45
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap to Pay Integration",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 183
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connection Status",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 212
+        }
+      },
+      {
+        "comment": "",
+        "key": "About",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 256
+        }
+      },
+      {
+        "comment": "",
+        "key": "Stripe Settings",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 26
+        }
+      },
+      {
+        "comment": "",
+        "key": "Configure Stripe API keys",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 30
+        }
+      },
+      {
+        "comment": "",
+        "key": "System Selection",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 55
+        }
+      },
+      {
+        "comment": "",
+        "key": "Choose accounting system to connect",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 59
+        }
+      },
+      {
+        "comment": "",
+        "key": "NetSuite Settings",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 83
+        }
+      },
+      {
+        "comment": "",
+        "key": "Configure OAuth integration",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 87
+        }
+      },
+      {
+        "comment": "",
+        "key": "Xero Settings",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 110
+        }
+      },
+      {
+        "comment": "",
+        "key": "Configure OAuth integration",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 114
+        }
+      },
+      {
+        "comment": "",
+        "key": "QuickBooks Settings",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 137
+        }
+      },
+      {
+        "comment": "",
+        "key": "Configure OAuth integration",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 141
+        }
+      },
+      {
+        "comment": "",
+        "key": "Salesforce Settings",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 164
+        }
+      },
+      {
+        "comment": "",
+        "key": "Configure OAuth integration",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 168
+        }
+      },
+      {
+        "comment": "",
+        "key": "Windcave Settings",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 193
+        }
+      },
+      {
+        "comment": "",
+        "key": "Configure Tap to Pay on iPhone",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 197
+        }
+      },
+      {
+        "comment": "",
+        "key": "Stripe",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 217
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connected",
+        "location": {
+          "startingColumn": 68,
+          "startingLine": 222
+        }
+      },
+      {
+        "comment": "",
+        "key": "Not Connected",
+        "location": {
+          "startingColumn": 82,
+          "startingLine": 222
+        }
+      },
+      {
+        "comment": "",
+        "key": "Windcave",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 245
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connected",
+        "location": {
+          "startingColumn": 70,
+          "startingLine": 250
+        }
+      },
+      {
+        "comment": "",
+        "key": "Not Connected",
+        "location": {
+          "startingColumn": 84,
+          "startingLine": 250
+        }
+      },
+      {
+        "comment": "",
+        "key": "Version",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 258
+        }
+      },
+      {
+        "comment": "",
+        "key": "1.0.0",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 260
+        }
+      },
+      {
+        "comment": "",
+        "key": "Build",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 265
+        }
+      },
+      {
+        "comment": "",
+        "key": "1",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 267
+        }
+      },
+      {
+        "comment": "",
+        "key": "Stripe Settings",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 346
+        }
+      },
+      {
+        "comment": "",
+        "key": "Stripe API Configuration",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 308
+        }
+      },
+      {
+        "comment": "",
+        "key": "Test Configuration",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 325
+        }
+      },
+      {
+        "comment": "",
+        "key": "Help",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 332
+        }
+      },
+      {
+        "comment": "",
+        "key": "Public Key",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 309
+        }
+      },
+      {
+        "comment": "",
+        "key": "Secret Key",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 314
+        }
+      },
+      {
+        "comment": "",
+        "key": "Account ID",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 319
+        }
+      },
+      {
+        "comment": "",
+        "key": "Test Stripe Connection",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 326
+        }
+      },
+      {
+        "comment": "",
+        "key": "To get your Stripe API keys:",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 334
+        }
+      },
+      {
+        "comment": "",
+        "key": "1. Log in to your Stripe Dashboard",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 337
+        }
+      },
+      {
+        "comment": "",
+        "key": "2. Go to Developers → API keys",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 338
+        }
+      },
+      {
+        "comment": "",
+        "key": "3. Copy your Publishable key and Secret key",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 339
+        }
+      },
+      {
+        "comment": "",
+        "key": "4. For Account ID, use your Stripe account ID",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 340
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 350
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 356
+        }
+      },
+      {
+        "comment": "",
+        "key": "NetSuite Settings",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 468
+        }
+      },
+      {
+        "comment": "",
+        "key": "NetSuite OAuth Configuration",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 374
+        }
+      },
+      {
+        "comment": "",
+        "key": "OAuth Flow",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 396
+        }
+      },
+      {
+        "comment": "",
+        "key": "Integration Setup",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 423
+        }
+      },
+      {
+        "comment": "",
+        "key": "Current Status",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 440
+        }
+      },
+      {
+        "comment": "",
+        "key": "Client ID",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 375
+        }
+      },
+      {
+        "comment": "",
+        "key": "Client Secret",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 380
+        }
+      },
+      {
+        "comment": "",
+        "key": "Account ID",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 385
+        }
+      },
+      {
+        "comment": "",
+        "key": "Redirect URI",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 390
+        }
+      },
+      {
+        "comment": "",
+        "key": "Disconnect NetSuite",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 398
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connect to NetSuite",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 403
+        }
+      },
+      {
+        "comment": "",
+        "key": "To set up NetSuite OAuth integration:",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 425
+        }
+      },
+      {
+        "comment": "",
+        "key": "1. Go to Setup → Integration → New",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 428
+        }
+      },
+      {
+        "comment": "",
+        "key": "2. Enter your application name and description",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 429
+        }
+      },
+      {
+        "comment": "",
+        "key": "3. Check 'Authorization Code Grant'",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 430
+        }
+      },
+      {
+        "comment": "",
+        "key": "4. Set Redirect URI to: fieldpay://oauth/callback",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 431
+        }
+      },
+      {
+        "comment": "",
+        "key": "5. Check 'REST Web Services'",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 432
+        }
+      },
+      {
+        "comment": "",
+        "key": "6. Save and copy the Client ID and Client Secret",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 433
+        }
+      },
+      {
+        "comment": "",
+        "key": "7. Use your NetSuite Account ID",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 434
+        }
+      },
+      {
+        "comment": "",
+        "key": "Access Token",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 443
+        }
+      },
+      {
+        "comment": "",
+        "key": "✓ Valid",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 445
+        }
+      },
+      {
+        "comment": "",
+        "key": "Expires",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 450
+        }
+      },
+      {
+        "comment": "",
+        "key": "Access Token",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 457
+        }
+      },
+      {
+        "comment": "",
+        "key": "Not Connected",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 459
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 472
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 478
+        }
+      },
+      {
+        "comment": "",
+        "key": "Windcave Settings",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 563
+        }
+      },
+      {
+        "comment": "",
+        "key": "Windcave API Configuration",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 498
+        }
+      },
+      {
+        "comment": "",
+        "key": "Test Configuration",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 510
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap to Pay Requirements",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 517
+        }
+      },
+      {
+        "comment": "",
+        "key": "Setup Instructions",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 532
+        }
+      },
+      {
+        "comment": "",
+        "key": "REST API Username",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 499
+        }
+      },
+      {
+        "comment": "",
+        "key": "REST API Key",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 504
+        }
+      },
+      {
+        "comment": "",
+        "key": "Test Windcave Connection",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 511
+        }
+      },
+      {
+        "comment": "",
+        "key": "To use Windcave Tap to Pay:",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 519
+        }
+      },
+      {
+        "comment": "",
+        "key": "• iOS 17+ required",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 522
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Active Windcave account",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 523
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Tap to Pay on iPhone entitlement from Apple",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 524
+        }
+      },
+      {
+        "comment": "",
+        "key": "• REST API user with Tap to Pay enabled",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 525
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Compatible iPhone with NFC",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 526
+        }
+      },
+      {
+        "comment": "",
+        "key": "1. Contact Windcave to enable Tap to Pay",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 534
+        }
+      },
+      {
+        "comment": "",
+        "key": "2. Request Tap to Pay entitlement from Apple",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 535
+        }
+      },
+      {
+        "comment": "",
+        "key": "3. Get your REST API credentials",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 536
+        }
+      },
+      {
+        "comment": "",
+        "key": "4. Configure settings in this app",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 537
+        }
+      },
+      {
+        "comment": "",
+        "key": "5. Test the connection",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 538
+        }
+      },
+      {
+        "comment": "",
+        "key": "Testing connection...",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 549
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 567
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 573
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,318 @@
+{
+  "" : {
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpay-master.dia",
+    "emit-module-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpay-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpay-master-emit-module.dia",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpay-master.swiftdeps"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/ContentView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ContentView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ContentView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ContentView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ContentView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ContentView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Models/Customer.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Customer~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Models/Invoice.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Invoice.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Invoice.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Invoice.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Invoice.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Invoice.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Invoice.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Invoice.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Invoice~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Models/Payment.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/Payment~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Models/SalesOrder.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrder.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrder.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrder.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrder.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrder.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrder.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrder.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrder~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Networking/NetSuiteAPI.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/NetSuiteAPI.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/NetSuiteAPI.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/NetSuiteAPI.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/NetSuiteAPI.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/NetSuiteAPI.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/NetSuiteAPI.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/NetSuiteAPI.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/NetSuiteAPI~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Networking/OAuthManager.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/OAuthManager.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/OAuthManager.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/OAuthManager.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/OAuthManager.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/OAuthManager.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/OAuthManager.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/OAuthManager.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/OAuthManager~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Networking/QuickBooksOAuthManager.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksOAuthManager.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksOAuthManager.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksOAuthManager.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksOAuthManager.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksOAuthManager.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksOAuthManager.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksOAuthManager.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksOAuthManager~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Networking/SalesforceOAuthManager.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceOAuthManager~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Networking/StripeManager.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/StripeManager.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/StripeManager.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/StripeManager.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/StripeManager.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/StripeManager.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/StripeManager.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/StripeManager.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/StripeManager~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Networking/SystemManager.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemManager.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemManager.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemManager.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemManager.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemManager.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemManager.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemManager.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemManager~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Networking/WindcaveManager.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/WindcaveManager.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/WindcaveManager.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/WindcaveManager.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/WindcaveManager.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/WindcaveManager.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/WindcaveManager.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/WindcaveManager.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/WindcaveManager~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Networking/XeroOAuthManager.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroOAuthManager.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroOAuthManager.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroOAuthManager.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroOAuthManager.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroOAuthManager.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroOAuthManager.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroOAuthManager.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroOAuthManager~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/ViewModels/CustomerViewModel.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerViewModel.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerViewModel.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerViewModel.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerViewModel.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerViewModel.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerViewModel.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerViewModel.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerViewModel~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/ViewModels/InvoiceViewModel.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceViewModel.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceViewModel.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceViewModel.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceViewModel.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceViewModel.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceViewModel.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceViewModel.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceViewModel~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/ViewModels/PaymentViewModel.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentViewModel~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/ViewModels/SalesOrderViewModel.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderViewModel.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderViewModel.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderViewModel.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderViewModel.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderViewModel.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderViewModel.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderViewModel.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderViewModel~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/ViewModels/SettingsViewModel.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsViewModel~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/CustomerListView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerListView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerListView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerListView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerListView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerListView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerListView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerListView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/CustomerListView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/InvoiceListView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceListView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceListView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceListView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceListView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceListView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceListView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceListView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/InvoiceListView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/PaymentView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/PaymentView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/QuickBooksSettingsView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/QuickBooksSettingsView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/ReportsView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/ReportsView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SalesOrderListView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderListView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderListView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderListView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderListView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderListView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderListView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderListView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesOrderListView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SalesforceSettingsView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SalesforceSettingsView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SettingsView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SettingsView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SharedComponents.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SharedComponents~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SystemSelectionView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/SystemSelectionView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/XeroSettingsView.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroSettingsView.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroSettingsView.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroSettingsView.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroSettingsView.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroSettingsView.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroSettingsView.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroSettingsView.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/XeroSettingsView~partial.swiftmodule"
+  },
+  "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/fieldpayApp.swift" : {
+    "const-values" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpayApp.swiftconstvalues",
+    "dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpayApp.d",
+    "diagnostics" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpayApp.dia",
+    "index-unit-output-path" : "/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpayApp.o",
+    "llvm-bc" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpayApp.bc",
+    "object" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpayApp.o",
+    "swift-dependencies" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpayApp.swiftdeps",
+    "swiftmodule" : "/Users/mitchellthompson/Desktop/fieldpay/DerivedData/Build/Intermediates.noindex/fieldpay.build/Debug-iphonesimulator/fieldpay.build/Objects-normal/arm64/fieldpayApp~partial.swiftmodule"
+  }
+}

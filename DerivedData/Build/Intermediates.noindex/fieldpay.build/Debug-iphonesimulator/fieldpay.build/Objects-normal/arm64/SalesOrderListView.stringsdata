@@ -1,0 +1,296 @@
+{
+  "source": "/Users/mitchellthompson/Desktop/fieldpay/fieldpay/Views/SalesOrderListView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Sales Orders",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 45
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading sales orders...",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 13
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search orders",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 39
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 20
+        }
+      },
+      {
+        "comment": "",
+        "key": "Retry",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "All Orders",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 62
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ship: %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 134
+        }
+      },
+      {
+        "comment": "",
+        "key": "Order Details",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 344
+        }
+      },
+      {
+        "comment": "",
+        "key": "Total Amount:",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 200
+        }
+      },
+      {
+        "comment": "",
+        "key": "Order Date:",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 208
+        }
+      },
+      {
+        "comment": "",
+        "key": "Expected Ship Date:",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 216
+        }
+      },
+      {
+        "comment": "",
+        "key": "Items",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 232
+        }
+      },
+      {
+        "comment": "",
+        "key": "Notes",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 250
+        }
+      },
+      {
+        "comment": "",
+        "key": "Order Actions",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 265
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 348
+        }
+      },
+      {
+        "comment": "",
+        "key": "Qty: %@ × %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 369
+        }
+      },
+      {
+        "comment": "",
+        "key": "Shipped",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 382
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add Sales Order",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 426
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customer Information",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 410
+        }
+      },
+      {
+        "comment": "",
+        "key": "Order Details",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 415
+        }
+      },
+      {
+        "comment": "",
+        "key": "Notes",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 421
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customer Name",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 411
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customer ID",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 412
+        }
+      },
+      {
+        "comment": "",
+        "key": "Amount",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 416
+        }
+      },
+      {
+        "comment": "",
+        "key": "Expected Ship Date",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 418
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 430
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 436
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit Sales Order",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 493
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customer Information",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 478
+        }
+      },
+      {
+        "comment": "",
+        "key": "Order Details",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 482
+        }
+      },
+      {
+        "comment": "",
+        "key": "Notes",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 488
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customer Name",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 479
+        }
+      },
+      {
+        "comment": "",
+        "key": "Amount",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 483
+        }
+      },
+      {
+        "comment": "",
+        "key": "Expected Ship Date",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 485
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 497
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 503
+        }
+      }
+    ]
+  },
+  "version": 1
+}
