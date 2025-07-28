@@ -57,7 +57,8 @@ class InvoiceViewModel: ObservableObject {
                 try await netSuiteAPI.testConnection()
                 
                 let fetchedInvoices = try await netSuiteAPI.fetchInvoices()
-                invoices = fetchedInvoices
+                // Sort invoices by createdDate in descending order (newest first)
+                invoices = fetchedInvoices.sorted { $0.createdDate > $1.createdDate }
                 isLoading = false
             } catch {
                 errorMessage = "Failed to load invoices: \(error.localizedDescription)"
@@ -94,17 +95,20 @@ class InvoiceViewModel: ObservableObject {
             invoice.customerName.localizedCaseInsensitiveContains(query)
         }
         
-        invoices = filteredInvoices
+        // Maintain newest-first sorting order
+        invoices = filteredInvoices.sorted { $0.createdDate > $1.createdDate }
     }
     
     func filterInvoicesByStatus(_ status: Invoice.InvoiceStatus) {
         let filteredInvoices = invoices.filter { $0.status == status }
-        invoices = filteredInvoices
+        // Maintain newest-first sorting order
+        invoices = filteredInvoices.sorted { $0.createdDate > $1.createdDate }
     }
     
     func filterInvoicesByCustomer(_ customerId: String) {
         let filteredInvoices = invoices.filter { $0.customerId == customerId }
-        invoices = filteredInvoices
+        // Maintain newest-first sorting order
+        invoices = filteredInvoices.sorted { $0.createdDate > $1.createdDate }
     }
     
     func getOverdueInvoices() -> [Invoice] {

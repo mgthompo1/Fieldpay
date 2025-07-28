@@ -166,7 +166,8 @@ struct InvoiceListView: View {
             }
         }
         
-        return invoices
+        // Always sort by createdDate in descending order (newest first)
+        return invoices.sorted { $0.createdDate > $1.createdDate }
     }
 }
 
