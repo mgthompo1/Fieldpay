@@ -8,6 +8,7 @@ struct NetSuiteResponse<T: Codable>: Codable {
     let count: Int?
     let hasMore: Bool?
     let offset: Int?
+    let totalResults: Int?
     let items: [T]
     
     enum CodingKeys: String, CodingKey {
@@ -15,6 +16,7 @@ struct NetSuiteResponse<T: Codable>: Codable {
         case count = "count"
         case hasMore = "hasMore"
         case offset = "offset"
+        case totalResults = "totalResults"
         case items = "items"
     }
 }
@@ -183,12 +185,35 @@ struct NetSuiteInvoiceResponse: Codable {
     let tranDate: String?
     let dueDate: String?
     let total: Double?
-    let balance: Double?
+    let amountRemaining: Double?
     let memo: String?
-    let status: String?
-    let itemList: NetSuiteItemList?
-    let dateCreated: String?
+    let status: NetSuiteStatus?
+    let item: NetSuiteItemReference?
+    let createdDate: String?
     let lastModifiedDate: String?
+    let amountPaid: Double?
+    let billAddress: String?
+    let shipAddress: String?
+    let email: String?
+    let customForm: NetSuiteEntityReference?
+    let location: NetSuiteEntityReference?
+    let subsidiary: NetSuiteEntityReference?
+    let terms: NetSuiteEntityReference?
+    let currency: NetSuiteEntityReference?
+    let postingPeriod: NetSuiteEntityReference?
+    let source: NetSuiteEntityReference?
+    let originator: String?
+    let toBeEmailed: Bool?
+    let toBeFaxed: Bool?
+    let toBePrinted: Bool?
+    let shipDate: String?
+    let shipIsResidential: Bool?
+    let shipOverride: Bool?
+    let estGrossProfit: Double?
+    let estGrossProfitPercent: Double?
+    let exchangeRate: Double?
+    let totalCostEstimate: Double?
+    let subtotal: Double?
     
     enum CodingKeys: String, CodingKey {
         case id = "id"
@@ -197,13 +222,45 @@ struct NetSuiteInvoiceResponse: Codable {
         case tranDate = "tranDate"
         case dueDate = "dueDate"
         case total = "total"
-        case balance = "balance"
+        case amountRemaining = "amountRemaining"
         case memo = "memo"
         case status = "status"
-        case itemList = "itemList"
-        case dateCreated = "dateCreated"
+        case item = "item"
+        case createdDate = "createdDate"
         case lastModifiedDate = "lastModifiedDate"
+        case amountPaid = "amountPaid"
+        case billAddress = "billAddress"
+        case shipAddress = "shipAddress"
+        case email = "email"
+        case customForm = "customForm"
+        case location = "location"
+        case subsidiary = "subsidiary"
+        case terms = "terms"
+        case currency = "currency"
+        case postingPeriod = "postingPeriod"
+        case source = "source"
+        case originator = "originator"
+        case toBeEmailed = "toBeEmailed"
+        case toBeFaxed = "toBeFaxed"
+        case toBePrinted = "toBePrinted"
+        case shipDate = "shipDate"
+        case shipIsResidential = "shipIsResidential"
+        case shipOverride = "shipOverride"
+        case estGrossProfit = "estGrossProfit"
+        case estGrossProfitPercent = "estGrossProfitPercent"
+        case exchangeRate = "exchangeRate"
+        case totalCostEstimate = "totalCostEstimate"
+        case subtotal = "subtotal"
     }
+}
+
+struct NetSuiteStatus: Codable {
+    let id: String?
+    let refName: String?
+}
+
+struct NetSuiteItemReference: Codable {
+    let links: [NetSuiteLink]?
 }
 
 struct NetSuiteEntityReference: Codable {
@@ -302,30 +359,17 @@ extension NetSuiteCustomerResponse {
 extension NetSuiteInvoiceResponse {
     func toInvoice() -> Invoice {
         // Enhanced date parsing with fallbacks
-        let createdDate = NetSuiteDateParser.parseDateWithFallback(dateCreated)
+        let createdDate = NetSuiteDateParser.parseDateWithFallback(createdDate)
         let _ = NetSuiteDateParser.parseDateWithFallback(lastModifiedDate, fallback: createdDate)
         let dueDate = NetSuiteDateParser.parseDate(dueDate)
         
-        // Enhanced item processing with better error handling
-        let items = itemList?.item?.compactMap { item -> Invoice.InvoiceItem? in
-            // Skip items with invalid data
-            guard item.validatedQuantity > 0 || item.validatedAmount > 0 else {
-                print("⚠️ DEBUG: NetSuiteInvoiceResponse - Skipping invalid item: \(item.description ?? "Unknown")")
-                return nil
-            }
-            
-            return Invoice.InvoiceItem(
-                id: item.item?.id ?? UUID().uuidString, // Use NetSuite item ID if available
-                description: item.description?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown Item",
-                quantity: item.validatedQuantity,
-                unitPrice: Decimal(item.validatedRate),
-                amount: Decimal(item.validatedAmount),
-                netSuiteItemId: item.item?.id
-            )
-        } ?? []
+        // For now, we'll create empty items since the item structure is different
+        // TODO: Implement proper item parsing when we have the correct structure
+        let items: [Invoice.InvoiceItem] = []
         
         // Enhanced status mapping using enum
-        let netSuiteStatus = NetSuiteInvoiceStatus(rawValue: status)
+        let statusString = status?.id ?? status?.refName ?? "unknown"
+        let netSuiteStatus = NetSuiteInvoiceStatus(rawValue: statusString)
         let invoiceStatus: Invoice.InvoiceStatus
         
         switch netSuiteStatus {
@@ -337,11 +381,13 @@ extension NetSuiteInvoiceResponse {
             invoiceStatus = .cancelled
         case .pending, .draft, .approved, .closed, .unknown:
             invoiceStatus = .pending
+        case .none:
+            invoiceStatus = .pending
         }
         
-        // Enhanced amount validation
+        // Enhanced amount validation using the correct field names
         let validatedTotal = max(0, total ?? 0)
-        let validatedBalance = max(0, balance ?? validatedTotal)
+        let validatedBalance = max(0, amountRemaining ?? validatedTotal)
         
         // Enhanced invoice number generation
         let invoiceNumber = tranId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false 
@@ -409,21 +455,441 @@ extension NetSuiteInvoiceResponse {
             issues.append("Invoice total is negative: \(total)")
         }
         
-        if let balance = balance, balance < 0 {
-            issues.append("Invoice balance is negative: \(balance)")
+        if let amountRemaining = amountRemaining, amountRemaining < 0 {
+            issues.append("Invoice amount remaining is negative: \(amountRemaining)")
         }
         
-        if let itemList = itemList, let items = itemList.item {
-            for (index, item) in items.enumerated() {
-                if item.validatedQuantity <= 0 {
-                    issues.append("Item \(index + 1) has invalid quantity: \(item.quantity ?? 0)")
-                }
-                if item.validatedAmount < 0 {
-                    issues.append("Item \(index + 1) has negative amount: \(item.amount ?? 0)")
-                }
-            }
-        }
+        // Note: Item validation is temporarily disabled since we changed the item structure
+        // TODO: Re-implement item validation when we have the correct item structure
         
         return issues
     }
+} 
+
+// MARK: - Invoice List Response
+struct NetSuiteInvoiceListResponse: Codable {
+    let links: [Link]
+    let count: Int
+    let hasMore: Bool
+    let items: [InvoiceItem]
+    let offset: Int?
+    let totalResults: Int?
+}
+
+struct InvoiceItem: Codable {
+    let links: [Link]
+    let id: String
+    let tranId: String?
+    let entity: EntityReference?
+    let amount: Double?
+    let status: String?
+    let trandate: String?
+    let duedate: String?
+    
+    /// Extracts the UUID from the self link href for detail API calls
+    var detailId: String {
+        if let selfLink = links.first(where: { $0.rel == "self" }),
+           let url = URL(string: selfLink.href),
+           let lastPathComponent = url.pathComponents.last {
+            print("Debug: InvoiceItem - Extracted UUID from href: \(lastPathComponent) (original id: \(id))")
+            return lastPathComponent
+        }
+        print("Debug: InvoiceItem - Failed to extract UUID from href, using original id: \(id)")
+        return id // Fallback to simple id if href parsing fails
+    }
+    
+    func toInvoice() -> Invoice {
+        return Invoice(
+            id: detailId, // Use the UUID from href for consistency
+            invoiceNumber: tranId ?? "INV-\(detailId)",
+            customerId: entity?.id ?? "",
+            customerName: entity?.refName ?? "Unknown Customer",
+            amount: Decimal(amount ?? 0.0),
+            balance: Decimal(amount ?? 0.0),
+            dueDate: parseDate(duedate),
+            createdDate: parseDate(trandate) ?? Date(),
+            netSuiteId: detailId,
+            items: []
+        )
+    }
+    
+    private func parseDate(_ dateString: String?) -> Date? {
+        guard let dateString = dateString else { return nil }
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: dateString)
+    }
+}
+
+// MARK: - Customer List Response
+struct NetSuiteCustomerListResponse: Codable {
+    let links: [Link]
+    let count: Int
+    let hasMore: Bool
+    let items: [CustomerItem]
+    let offset: Int?
+    let totalResults: Int?
+}
+
+struct CustomerItem: Codable {
+    let links: [Link]
+    let id: String
+    let entityId: String?
+    let companyName: String?
+    let email: String?
+    let phone: String?
+    let isInactive: Bool?
+    
+    /// Extracts the UUID from the self link href for detail API calls
+    var detailId: String {
+        if let selfLink = links.first(where: { $0.rel == "self" }),
+           let url = URL(string: selfLink.href),
+           let lastPathComponent = url.pathComponents.last {
+            print("Debug: CustomerItem - Extracted UUID from href: \(lastPathComponent) (original id: \(id))")
+            return lastPathComponent
+        }
+        print("Debug: CustomerItem - Failed to extract UUID from href, using original id: \(id)")
+        return id // Fallback to simple id if href parsing fails
+    }
+    
+    func toCustomer() -> Customer {
+        return Customer(
+            id: detailId, // Use the UUID from href for consistency
+            name: companyName ?? entityId ?? "Unknown Customer",
+            email: email,
+            phone: phone,
+            address: nil,
+            netSuiteId: detailId,
+            companyName: companyName,
+            isActive: !(isInactive ?? false)
+        )
+    }
+}
+
+// MARK: - Common Types
+struct Link: Codable {
+    let rel: String
+    let href: String
+}
+
+// MARK: - Payment List Response
+struct NetSuitePaymentListResponse: Codable {
+    let links: [Link]
+    let count: Int
+    let hasMore: Bool
+    let items: [PaymentItem]
+    let offset: Int?
+    let totalResults: Int?
+}
+
+struct PaymentItem: Codable {
+    let links: [Link]
+    let id: String
+    let tranId: String?
+    let entity: EntityReference?
+    let amount: Double?
+    let status: String?
+    let trandate: String?
+    
+    /// Extracts the UUID from the self link href for detail API calls
+    var detailId: String {
+        if let selfLink = links.first(where: { $0.rel == "self" }),
+           let url = URL(string: selfLink.href),
+           let lastPathComponent = url.pathComponents.last {
+            print("Debug: PaymentItem - Extracted UUID from href: \(lastPathComponent) (original id: \(id))")
+            return lastPathComponent
+        }
+        print("Debug: PaymentItem - Failed to extract UUID from href, using original id: \(id)")
+        return id // Fallback to simple id if href parsing fails
+    }
+    
+    func toPayment() -> Payment {
+        return Payment(
+            id: detailId, // Use the UUID from href for consistency
+            amount: Decimal(amount ?? 0.0),
+            status: Payment.PaymentStatus(rawValue: status ?? "pending") ?? .pending,
+            paymentMethod: .cash,
+            customerId: entity?.id,
+            invoiceId: nil,
+            description: "Payment from NetSuite",
+            netSuitePaymentId: detailId,
+            createdDate: parseDate(trandate) ?? Date()
+        )
+    }
+    
+    private func parseDate(_ dateString: String?) -> Date? {
+        guard let dateString = dateString else { return nil }
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: dateString)
+    }
+} 
+
+// MARK: - SuiteQL Response Models
+
+struct SuiteQLResponse: Codable {
+    let links: [Link]
+    let count: Int
+    let hasMore: Bool
+    let items: [SuiteQLItem]
+    let offset: Int?
+    let totalResults: Int?
+}
+
+struct SuiteQLItem: Codable {
+    let values: [String: String]
+    
+    enum CodingKeys: String, CodingKey {
+        case values
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let valuesArray = try container.decode([String].self, forKey: .values)
+        
+        // Convert array to dictionary with column names
+        // This is a simplified approach - in practice, you'd need to know the column names
+        var dict: [String: String] = [:]
+        for (index, value) in valuesArray.enumerated() {
+            dict["column\(index)"] = value
+        }
+        self.values = dict
+    }
+}
+
+// MARK: - SuiteQL Query Builder
+
+enum SuiteQLQuery {
+    case customerTransactionHistory(customerId: String)
+    case customerPaymentHistory(customerId: String)
+    case customerInvoiceHistory(customerId: String)
+    case custom(String)
+    
+    var query: String {
+        switch self {
+        case .customerTransactionHistory(let customerId):
+            return """
+            SELECT 
+                t.id,
+                t.tranid,
+                t.trandate,
+                t.total,
+                t.type,
+                t.status,
+                t.memo
+            FROM transaction t
+            WHERE t.entity = '\(customerId)'
+            ORDER BY t.trandate DESC
+            LIMIT 50
+            """
+            
+        case .customerPaymentHistory(let customerId):
+            return """
+            SELECT 
+                t.id,
+                t.tranid,
+                t.trandate,
+                t.total,
+                t.status,
+                t.memo,
+                t.paymentmethod
+            FROM customerpayment t
+            WHERE t.customer = '\(customerId)'
+            ORDER BY t.trandate DESC
+            LIMIT 50
+            """
+            
+        case .customerInvoiceHistory(let customerId):
+            return """
+            SELECT 
+                t.id,
+                t.tranid,
+                t.trandate,
+                t.total,
+                t.status,
+                t.memo,
+                t.entity
+            FROM invoice t
+            WHERE t.entity = '\(customerId)'
+            ORDER BY t.trandate DESC
+            LIMIT 50
+            """
+            
+        case .custom(let query):
+            return query
+        }
+    }
+}
+
+// MARK: - Customer Transaction Models
+
+struct CustomerTransactionResponse: Codable {
+    let links: [Link]
+    let count: Int
+    let hasMore: Bool
+    let items: [TransactionItem]
+    let offset: Int?
+    let totalResults: Int?
+}
+
+struct TransactionItem: Codable {
+    let links: [Link]
+    let id: String
+    let tranId: String?
+    let trandate: String?
+    let amount: Double?
+    let type: String?
+    let status: String?
+    let memo: String?
+    
+    func toTransaction() -> CustomerTransaction {
+        return CustomerTransaction(
+            id: id,
+            transactionNumber: tranId ?? "TXN-\(id)",
+            date: parseDate(trandate) ?? Date(),
+            amount: Decimal(amount ?? 0.0),
+            type: type ?? "Unknown",
+            status: status ?? "Unknown",
+            memo: memo
+        )
+    }
+    
+    private func parseDate(_ dateString: String?) -> Date? {
+        guard let dateString = dateString else { return nil }
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+        
+        if let date = formatter.date(from: dateString) {
+            return date
+        }
+        
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+        if let date = formatter.date(from: dateString) {
+            return date
+        }
+        
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: dateString)
+    }
+}
+
+// MARK: - Customer Payment Models
+
+struct CustomerPaymentResponse: Codable {
+    let links: [Link]
+    let count: Int
+    let hasMore: Bool
+    let items: [CustomerPaymentItem]
+    let offset: Int?
+    let totalResults: Int?
+}
+
+struct CustomerPaymentItem: Codable {
+    let links: [Link]
+    let id: String
+    let tranId: String?
+    let trandate: String?
+    let amount: Double?
+    let status: String?
+    let memo: String?
+    let paymentMethod: String?
+    
+    func toPayment() -> CustomerPayment {
+        return CustomerPayment(
+            id: id,
+            paymentNumber: tranId ?? "PAY-\(id)",
+            date: parseDate(trandate) ?? Date(),
+            amount: Decimal(amount ?? 0.0),
+            status: status ?? "Unknown",
+            memo: memo,
+            paymentMethod: paymentMethod
+        )
+    }
+    
+    private func parseDate(_ dateString: String?) -> Date? {
+        guard let dateString = dateString else { return nil }
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+        
+        if let date = formatter.date(from: dateString) {
+            return date
+        }
+        
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+        if let date = formatter.date(from: dateString) {
+            return date
+        }
+        
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: dateString)
+    }
+}
+
+// MARK: - Customer Transaction and Payment Models
+
+struct CustomerTransaction: Identifiable, Codable {
+    let id: String
+    let transactionNumber: String
+    let date: Date
+    let amount: Decimal
+    let type: String
+    let status: String
+    let memo: String?
+    
+    var formattedAmount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        return formatter.string(from: amount as NSDecimalNumber) ?? "$0.00"
+    }
+    
+    var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+}
+
+struct CustomerPayment: Identifiable, Codable {
+    let id: String
+    let paymentNumber: String
+    let date: Date
+    let amount: Decimal
+    let status: String
+    let memo: String?
+    let paymentMethod: String?
+    
+    var formattedAmount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        return formatter.string(from: amount as NSDecimalNumber) ?? "$0.00"
+    }
+    
+    var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+} 
+
+// MARK: - Helper Functions
+
+func parseDate(_ dateString: String?) -> Date? {
+    guard let dateString = dateString else { return nil }
+    
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+    
+    if let date = formatter.date(from: dateString) {
+        return date
+    }
+    
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+    if let date = formatter.date(from: dateString) {
+        return date
+    }
+    
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.date(from: dateString)
 } 

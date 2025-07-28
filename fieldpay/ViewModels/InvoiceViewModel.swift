@@ -8,85 +8,245 @@ class InvoiceViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
+    // In-memory cache for session
+    private var invoiceCache: [String: Invoice] = [:]
+    private var loadedPages: Set<Int> = []
+    private(set) var currentPage: Int = 0
+    private let pageSize: Int = 50
+    private(set) var hasMore: Bool = true
+    
+    // Batch detail fetching
+    private var detailFetchQueue: [String] = []
+    private var isFetchingDetails = false
+    private let maxConcurrentDetailFetches = 3
+    
     private let netSuiteAPI = NetSuiteAPI.shared
     private let oAuthManager = OAuthManager.shared
     private var cancellables = Set<AnyCancellable>()
     
     init() {
-        // Listen for OAuth authentication state changes
         oAuthManager.$isAuthenticated
             .sink { [weak self] isAuthenticated in
-                print("Debug: InvoiceViewModel - OAuth authentication state changed to: \(isAuthenticated)")
                 if isAuthenticated {
-                    print("Debug: InvoiceViewModel - OAuth authenticated, loading invoices...")
-                    self?.loadInvoices()
+                    self?.resetPagination()
+                    Task {
+                        await self?.loadNextPage()
+                    }
                 } else {
-                    print("Debug: InvoiceViewModel - OAuth not authenticated, clearing invoices...")
                     self?.invoices = []
                     self?.errorMessage = nil
+                    self?.invoiceCache.removeAll()
+                    self?.loadedPages.removeAll()
+                    self?.currentPage = 0
+                    self?.hasMore = true
+                    self?.detailFetchQueue.removeAll()
+                    self?.isFetchingDetails = false
                 }
             }
             .store(in: &cancellables)
     }
     
-    func loadInvoices() {
-        // Check if OAuth is configured before making API calls
-        guard OAuthManager.shared.isAuthenticated else {
-            errorMessage = "NetSuite OAuth not authenticated. Please go to Settings > NetSuite Settings and complete the OAuth authorization flow."
-            
-            // Check if OAuth is configured but not authenticated
-            let clientId = UserDefaults.standard.string(forKey: "netsuite_client_id") ?? ""
-            let clientSecret = UserDefaults.standard.string(forKey: "netsuite_client_secret") ?? ""
-            let accountId = UserDefaults.standard.string(forKey: "netsuite_account_id") ?? ""
-            
-            if !clientId.isEmpty && !clientSecret.isEmpty && !accountId.isEmpty {
-                errorMessage = "NetSuite OAuth credentials are configured but not authenticated. Please go to Settings > NetSuite Settings and tap 'Connect to NetSuite' to complete the authorization."
-            } else {
-                errorMessage = "NetSuite OAuth not configured. Please go to Settings > NetSuite Settings and enter your Client ID, Client Secret, and Account ID, then tap 'Connect to NetSuite'."
-            }
-            
-            return
-        }
-        
+    func resetPagination() {
+        invoices = []
+        invoiceCache.removeAll()
+        loadedPages.removeAll()
+        currentPage = 0
+        hasMore = true
+        detailFetchQueue.removeAll()
+        isFetchingDetails = false
+    }
+    
+    func loadNextPage(status: String? = nil) async {
+        guard !isLoading, hasMore else { return }
         isLoading = true
         errorMessage = nil
+        let pageToLoad = currentPage
+        do {
+            let resource = NetSuiteResource.invoices(limit: pageSize, offset: pageToLoad * pageSize, status: status)
+            let response: NetSuiteInvoiceListResponse = try await netSuiteAPI.fetch(resource, type: NetSuiteInvoiceListResponse.self)
+            let newInvoices = response.items.map { $0.toInvoice() }
+            // Cache and append
+            for invoice in newInvoices {
+                invoiceCache[invoice.id] = invoice
+            }
+            invoices.append(contentsOf: newInvoices)
+            loadedPages.insert(pageToLoad)
+            currentPage += 1
+            hasMore = newInvoices.count == pageSize
+            isLoading = false
+            
+            // Queue detail fetching for new invoices
+            await queueDetailFetching(for: newInvoices.map { $0.id })
+        } catch {
+            errorMessage = "Failed to load invoices: \(error.localizedDescription)"
+            isLoading = false
+        }
+    }
+    
+    // MARK: - Batch Detail Fetching
+    
+    private func queueDetailFetching(for invoiceIds: [String]) async {
+        // Add new IDs to queue
+        detailFetchQueue.append(contentsOf: invoiceIds)
         
-        Task {
-            do {
-                // Test connection first
-                try await netSuiteAPI.testConnection()
-                
-                let fetchedInvoices = try await netSuiteAPI.fetchInvoices()
-                // Sort invoices by createdDate in descending order (newest first)
-                invoices = fetchedInvoices.sorted { $0.createdDate > $1.createdDate }
-                isLoading = false
-            } catch {
-                errorMessage = "Failed to load invoices: \(error.localizedDescription)"
-                isLoading = false
-                print("Debug: InvoiceViewModel - Error loading invoices: \(error)")
+        // Start fetching if not already in progress
+        if !isFetchingDetails {
+            await fetchDetailsInBatches()
+        }
+    }
+    
+    private func fetchDetailsInBatches() async {
+        guard !detailFetchQueue.isEmpty else { return }
+        
+        isFetchingDetails = true
+        
+        while !detailFetchQueue.isEmpty {
+            let batchSize = min(maxConcurrentDetailFetches, detailFetchQueue.count)
+            let batch = Array(detailFetchQueue.prefix(batchSize))
+            detailFetchQueue.removeFirst(batchSize)
+            
+            await withTaskGroup(of: Void.self) { group in
+                for invoiceId in batch {
+                    group.addTask {
+                        await self.fetchInvoiceDetailWithRetry(invoiceId: invoiceId)
+                    }
+                }
+            }
+            
+            // Throttle between batches to avoid overwhelming the API
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        }
+        
+        isFetchingDetails = false
+    }
+    
+    private func fetchInvoiceDetailWithRetry(invoiceId: String, retryCount: Int = 0) async {
+        let maxRetries = 2
+        let baseDelay: UInt64 = 1_000_000_000 // 1 second
+        
+        do {
+            try await fetchInvoiceDetail(invoiceId: invoiceId)
+        } catch {
+            if retryCount < maxRetries {
+                print("Retrying fetch for invoice \(invoiceId), attempt \(retryCount + 1)")
+                let delay = baseDelay * UInt64(pow(2.0, Double(retryCount))) // Exponential backoff
+                try? await Task.sleep(nanoseconds: delay)
+                await fetchInvoiceDetailWithRetry(invoiceId: invoiceId, retryCount: retryCount + 1)
+            } else {
+                print("Failed to fetch invoice \(invoiceId) after \(maxRetries + 1) attempts")
             }
         }
     }
     
-    func loadInvoice(id: String) {
-        isLoading = true
-        errorMessage = nil
-        
-        Task {
-            do {
-                let invoice = try await netSuiteAPI.fetchInvoice(id: id)
-                selectedInvoice = invoice
-                isLoading = false
-            } catch {
-                errorMessage = error.localizedDescription
-                isLoading = false
+    private func fetchInvoiceDetail(invoiceId: String) async throws {
+        do {
+            // First, try the standard REST API approach
+            let resource = NetSuiteResource.invoiceDetail(id: invoiceId)
+            let detailedInvoice: NetSuiteInvoiceRecord = try await netSuiteAPI.fetch(resource, type: NetSuiteInvoiceRecord.self)
+            let invoice = detailedInvoice.toInvoice()
+            
+            await MainActor.run {
+                // Update cache
+                self.invoiceCache[invoiceId] = invoice
+                
+                // Update in published array if present
+                if let index = self.invoices.firstIndex(where: { $0.id == invoiceId }) {
+                    self.invoices[index] = invoice
+                }
             }
+        } catch {
+            print("Failed to fetch detail for invoice \(invoiceId) via REST API: \(error)")
+            
+            // Fallback: Try using SuiteQL to get invoice details
+            do {
+                let suiteQLQuery = "SELECT id, tranid, entity, total, amountremaining, amountpaid, trandate, status, memo FROM invoice WHERE id = '\(invoiceId)' LIMIT 1"
+                let resource = NetSuiteResource.suiteQL(query: suiteQLQuery)
+                let suiteQLResponse: SuiteQLResponse = try await netSuiteAPI.fetch(resource, type: SuiteQLResponse.self)
+                
+                if let firstRow = suiteQLResponse.items.first {
+                    let customerId = firstRow.values["column2"] ?? ""
+                    let customerName = await fetchCustomerName(customerId: customerId)
+                    
+                    // Create a basic invoice from SuiteQL data
+                    let invoice = Invoice(
+                        id: firstRow.values["column0"] ?? invoiceId,
+                        invoiceNumber: firstRow.values["column1"] ?? "INV-\(invoiceId)",
+                        customerId: customerId,
+                        customerName: customerName,
+                        amount: Decimal(string: firstRow.values["column3"] ?? "0") ?? Decimal(0),
+                        balance: Decimal(string: firstRow.values["column4"] ?? "0") ?? Decimal(0),
+                        status: Invoice.InvoiceStatus(rawValue: firstRow.values["column7"] ?? "pending") ?? .pending,
+                        dueDate: nil, // Not available in this query
+                        createdDate: Date(), // Use current date as fallback
+                        netSuiteId: invoiceId,
+                        items: [],
+                        notes: firstRow.values["column8"]
+                    )
+                    
+                    await MainActor.run {
+                        // Update cache
+                        self.invoiceCache[invoiceId] = invoice
+                        
+                        // Update in published array if present
+                        if let index = self.invoices.firstIndex(where: { $0.id == invoiceId }) {
+                            self.invoices[index] = invoice
+                        }
+                    }
+                }
+            } catch {
+                print("Failed to fetch detail for invoice \(invoiceId) via SuiteQL fallback: \(error)")
+            }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func fetchCustomerName(customerId: String) async -> String {
+        guard !customerId.isEmpty else { return "Unknown Customer" }
+        
+        do {
+            let suiteQLQuery = "SELECT entityid, companyname FROM customer WHERE id = '\(customerId)' LIMIT 1"
+            let resource = NetSuiteResource.suiteQL(query: suiteQLQuery)
+            let suiteQLResponse: SuiteQLResponse = try await netSuiteAPI.fetch(resource, type: SuiteQLResponse.self)
+            
+            if let firstRow = suiteQLResponse.items.first {
+                return firstRow.values["column1"] ?? firstRow.values["column0"] ?? "Customer \(customerId)"
+            }
+        } catch {
+            print("Failed to fetch customer name for \(customerId): \(error)")
+        }
+        
+        return "Customer \(customerId)"
+    }
+    
+    // MARK: - Public Detail Fetching
+    
+    func loadInvoiceDetail(id: String) async {
+        // Check cache first
+        if let cachedInvoice = invoiceCache[id] {
+            await MainActor.run {
+                self.selectedInvoice = cachedInvoice
+            }
+            return
+        }
+        
+        do {
+            try await fetchInvoiceDetail(invoiceId: id)
+            
+            await MainActor.run {
+                self.selectedInvoice = self.invoiceCache[id]
+            }
+        } catch {
+            print("Failed to load invoice detail for \(id): \(error)")
         }
     }
     
     func searchInvoices(query: String) {
         guard !query.isEmpty else {
-            loadInvoices()
+            resetPagination()
+            Task {
+                await loadNextPage()
+            }
             return
         }
         
@@ -182,5 +342,19 @@ class InvoiceViewModel: ObservableObject {
         let dateString = dateFormatter.string(from: Date())
         let randomSuffix = String(format: "%04d", Int.random(in: 1...9999))
         return "INV-\(dateString)-\(randomSuffix)"
+    }
+    
+    // MARK: - Debug Methods
+    
+    func debugInvoiceIds() async {
+        print("Debug: InvoiceViewModel - Testing invoice ID formats...")
+        
+        // Test with a few invoice IDs from the current list
+        let testIds = Array(invoices.prefix(3)).map { $0.id }
+        
+        for invoiceId in testIds {
+            print("Debug: InvoiceViewModel - Testing invoice ID: \(invoiceId)")
+            await netSuiteAPI.debugIdFormat(customerId: invoiceId) // Reuse the same method
+        }
     }
 } 
