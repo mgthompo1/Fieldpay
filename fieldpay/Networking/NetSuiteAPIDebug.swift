@@ -110,24 +110,26 @@ class NetSuiteAPIDebug: ObservableObject {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("🔴 DEBUG: NetSuiteAPI - Invalid response type for customer count")
             throw NetSuiteError.requestFailed
         }
         
-        if httpResponse.statusCode != 200 {
-            print("🔴 DEBUG: NetSuiteAPI - Customer count request failed with status: \(httpResponse.statusCode)")
+        print("📊 DEBUG: NetSuiteAPI - Customer count response status: \(httpResponse.statusCode)")
+        
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📄 DEBUG: NetSuiteAPI - Customer count response: \(responseString)")
+        }
+        
+        guard httpResponse.statusCode == 200 else {
             throw NetSuiteError.requestFailed
         }
         
-        // Parse the response to get total count
+        // Try to parse the response to get count
         do {
             let netSuiteResponse = try JSONDecoder().decode(NetSuiteResponse<NetSuiteCustomerResponse>.self, from: data)
-            let totalCount = netSuiteResponse.totalResults
-            print("🟢 DEBUG: NetSuiteAPI - Customer count: \(totalCount)")
-            return totalCount
+            return netSuiteResponse.count ?? netSuiteResponse.items.count
         } catch {
-            print("🔴 DEBUG: NetSuiteAPI - Failed to parse customer count response: \(error)")
-            throw NetSuiteError.invalidResponse
+            print("⚠️ DEBUG: NetSuiteAPI - Could not parse customer count response: \(error)")
+            return 0
         }
     }
     
@@ -150,25 +152,70 @@ class NetSuiteAPIDebug: ObservableObject {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("🔴 DEBUG: NetSuiteAPI - Invalid response type for invoice count")
             throw NetSuiteError.requestFailed
         }
         
-        if httpResponse.statusCode != 200 {
-            print("🔴 DEBUG: NetSuiteAPI - Invoice count request failed with status: \(httpResponse.statusCode)")
+        print("📊 DEBUG: NetSuiteAPI - Invoice count response status: \(httpResponse.statusCode)")
+        
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📄 DEBUG: NetSuiteAPI - Invoice count response: \(responseString)")
+        }
+        
+        guard httpResponse.statusCode == 200 else {
             throw NetSuiteError.requestFailed
         }
         
-        // Parse the response to get total count
+        // Try to parse the response to get count
         do {
             let netSuiteResponse = try JSONDecoder().decode(NetSuiteResponse<NetSuiteInvoiceResponse>.self, from: data)
-            let totalCount = netSuiteResponse.totalResults
-            print("🟢 DEBUG: NetSuiteAPI - Invoice count: \(totalCount)")
-            return totalCount
+            return netSuiteResponse.count ?? netSuiteResponse.items.count
         } catch {
-            print("🔴 DEBUG: NetSuiteAPI - Failed to parse invoice count response: \(error)")
-            throw NetSuiteError.invalidResponse
+            print("⚠️ DEBUG: NetSuiteAPI - Could not parse invoice count response: \(error)")
+            return 0
         }
+    }
+    
+    // MARK: - Comprehensive Data Testing
+    func testRealNetSuiteData() async throws -> String {
+        guard isConfigured() else {
+            return "❌ NetSuite not configured"
+        }
+        
+        var result = "🔍 NetSuite Data Test Results:\n\n"
+        
+        // Test customers
+        do {
+            let customerCount = try await getCustomerCount()
+            result += "👥 Customers: \(customerCount)\n"
+        } catch {
+            result += "👥 Customers: ❌ Error - \(error.localizedDescription)\n"
+        }
+        
+        // Test invoices
+        do {
+            let invoiceCount = try await getInvoiceCount()
+            result += "📄 Invoices: \(invoiceCount)\n"
+        } catch {
+            result += "📄 Invoices: ❌ Error - \(error.localizedDescription)\n"
+        }
+        
+        // Test raw customer data
+        do {
+            let rawCustomerData = try await testRawAPI(endpoint: "/services/rest/record/v1/customer?limit=3")
+            result += "\n📋 Sample Customer Data:\n\(rawCustomerData.prefix(500))...\n"
+        } catch {
+            result += "\n📋 Sample Customer Data: ❌ Error - \(error.localizedDescription)\n"
+        }
+        
+        // Test raw invoice data
+        do {
+            let rawInvoiceData = try await testRawAPI(endpoint: "/services/rest/record/v1/invoice?limit=3")
+            result += "\n📋 Sample Invoice Data:\n\(rawInvoiceData.prefix(500))...\n"
+        } catch {
+            result += "\n📋 Sample Invoice Data: ❌ Error - \(error.localizedDescription)\n"
+        }
+        
+        return result
     }
     
     // MARK: - Customers

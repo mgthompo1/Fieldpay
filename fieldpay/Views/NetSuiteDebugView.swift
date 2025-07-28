@@ -105,6 +105,11 @@ struct NetSuiteDebugView: View {
                                 action: { performAPITest("data_status", checkDataStatus) }
                             )
                             DebugButton(
+                                title: "Test Real NetSuite Data",
+                                isLoading: isLoading && loadingTask == "real_data",
+                                action: { performAPITest("real_data", testRealNetSuiteData) }
+                            )
+                            DebugButton(
                                 title: "Clear Debug Output",
                                 isLoading: false,
                                 action: clearDebugOutput
@@ -344,6 +349,61 @@ struct NetSuiteDebugView: View {
         log("  • Invoices: \(invoiceCount)")
         await MainActor.run {
             alertMessage = "NetSuite Data Status checked. Customers: \(customerCount), Invoices: \(invoiceCount)"
+            showingAlert = true
+        }
+    }
+    
+    private func testRealNetSuiteData() async throws {
+        log("🔍 Testing real NetSuite data fetch...")
+        
+        // Test raw API responses first
+        log("📡 Testing raw API responses...")
+        
+        do {
+            let rawCustomerResponse = try await netSuiteAPIDebug.testRawAPI(endpoint: "/services/rest/record/v1/customer?limit=3")
+            log("📋 Raw Customer API Response:")
+            log(rawCustomerResponse.prefix(1000))
+            
+            let rawInvoiceResponse = try await netSuiteAPIDebug.testRawAPI(endpoint: "/services/rest/record/v1/invoice?limit=3")
+            log("📄 Raw Invoice API Response:")
+            log(rawInvoiceResponse.prefix(1000))
+        } catch {
+            log("❌ Raw API test failed: \(error.localizedDescription)")
+        }
+        
+        // Test parsed data
+        log("🔄 Testing parsed data...")
+        let customers = try await netSuiteAPI.fetchCustomers()
+        let invoices = try await netSuiteAPI.fetchInvoices()
+        
+        log("✅ Parsed NetSuite Data:")
+        log("  • Fetched \(customers.count) customers")
+        for (index, customer) in customers.enumerated() {
+            log("    📋 \(index + 1). \(customer.name) (ID: \(customer.id))")
+            if customer.name == "Unknown Customer" {
+                log("    ⚠️  WARNING: Customer has 'Unknown Customer' name - possible parsing issue")
+            }
+        }
+        log("  • Fetched \(invoices.count) invoices")
+        for (index, invoice) in invoices.enumerated() {
+            log("    📄 \(index + 1). \(invoice.invoiceNumber) - \(invoice.customerName) ($\(String(format: "%.2f", NSDecimalNumber(decimal: invoice.amount).doubleValue)))")
+            if invoice.customerName == "Unknown Customer" {
+                log("    ⚠️  WARNING: Invoice has 'Unknown Customer' - possible parsing issue")
+            }
+        }
+        
+        // Check for dummy data indicators
+        let hasDummyData = customers.contains { $0.name == "Unknown Customer" } || 
+                          invoices.contains { $0.customerName == "Unknown Customer" }
+        
+        if hasDummyData {
+            log("🚨 ALERT: Found 'Unknown Customer' entries - this indicates parsing issues or dummy data")
+        } else {
+            log("✅ No dummy data detected - all entries have proper names")
+        }
+        
+        await MainActor.run {
+            alertMessage = "Real NetSuite Data fetched. Customers: \(customers.count), Invoices: \(invoices.count)"
             showingAlert = true
         }
     }
