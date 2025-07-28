@@ -117,6 +117,13 @@ class SystemManager: ObservableObject {
             
             currentSystem = system
             userDefaults.set(system.rawValue, forKey: "current_accounting_system")
+            
+            // Update status immediately after successful connection
+            if isConnected {
+                connectionStatus = "Connected to \(system.displayName)"
+                print("Debug: SystemManager - Connection successful, status updated to: \(connectionStatus)")
+            }
+            
             updateConnectionStatus()
             print("Debug: SystemManager - Successfully connected to \(system.displayName)")
             
@@ -285,93 +292,120 @@ class SystemManager: ObservableObject {
             print("Debug: SystemManager - Set to standalone mode")
         case .netsuite:
             let isAuth = oAuthManager.isAuthenticated
-            if isAuth {
-                // Check if we can get a valid token
+            if isAuth && isConnected {
+                // If we're already connected, show connected status immediately
+                connectionStatus = "Connected to NetSuite"
+                print("Debug: SystemManager - NetSuite status: \(connectionStatus), isConnected: \(isConnected)")
+            } else if isAuth {
+                // If authenticated but not yet connected, validate token
                 Task {
                     do {
                         let _ = try await oAuthManager.getValidAccessToken()
                         await MainActor.run {
                             connectionStatus = "Connected to NetSuite"
                             isConnected = true
+                            print("Debug: SystemManager - NetSuite status updated to: \(connectionStatus)")
                         }
                     } catch {
                         await MainActor.run {
                             connectionStatus = "NetSuite Token Expired"
                             isConnected = false
+                            print("Debug: SystemManager - NetSuite token expired: \(error)")
                         }
                     }
                 }
             } else {
                 connectionStatus = "NetSuite Not Authenticated"
                 isConnected = false
+                print("Debug: SystemManager - NetSuite status: \(connectionStatus), isConnected: \(isConnected)")
             }
-            print("Debug: SystemManager - NetSuite status: \(connectionStatus), isConnected: \(isConnected)")
         case .xero:
             let isAuth = xeroOAuthManager.isAuthenticated
-            if isAuth {
+            if isAuth && isConnected {
+                // If we're already connected, show connected status immediately
+                connectionStatus = "Connected to Xero"
+                print("Debug: SystemManager - Xero status: \(connectionStatus), isConnected: \(isConnected)")
+            } else if isAuth {
+                // If authenticated but not yet connected, validate token
                 Task {
                     do {
                         let _ = try await xeroOAuthManager.getValidAccessToken()
                         await MainActor.run {
                             connectionStatus = "Connected to Xero"
                             isConnected = true
+                            print("Debug: SystemManager - Xero status updated to: \(connectionStatus)")
                         }
                     } catch {
                         await MainActor.run {
                             connectionStatus = "Xero Token Expired"
                             isConnected = false
+                            print("Debug: SystemManager - Xero token expired: \(error)")
                         }
                     }
                 }
             } else {
                 connectionStatus = "Xero Not Authenticated"
                 isConnected = false
+                print("Debug: SystemManager - Xero status: \(connectionStatus), isConnected: \(isConnected)")
             }
-            print("Debug: SystemManager - Xero status: \(connectionStatus), isConnected: \(isConnected)")
         case .quickbooks:
             let isAuth = quickBooksOAuthManager.isAuthenticated
-            if isAuth {
+            if isAuth && isConnected {
+                // If we're already connected, show connected status immediately
+                connectionStatus = "Connected to QuickBooks"
+                print("Debug: SystemManager - QuickBooks status: \(connectionStatus), isConnected: \(isConnected)")
+            } else if isAuth {
+                // If authenticated but not yet connected, validate token
                 Task {
                     do {
                         let _ = try await quickBooksOAuthManager.getValidAccessToken()
                         await MainActor.run {
                             connectionStatus = "Connected to QuickBooks"
                             isConnected = true
+                            print("Debug: SystemManager - QuickBooks status updated to: \(connectionStatus)")
                         }
                     } catch {
                         await MainActor.run {
                             connectionStatus = "QuickBooks Token Expired"
                             isConnected = false
+                            print("Debug: SystemManager - QuickBooks token expired: \(error)")
                         }
                     }
                 }
             } else {
                 connectionStatus = "QuickBooks Not Authenticated"
                 isConnected = false
+                print("Debug: SystemManager - QuickBooks status: \(connectionStatus), isConnected: \(isConnected)")
             }
-            print("Debug: SystemManager - QuickBooks status: \(connectionStatus), isConnected: \(isConnected)")
         case .salesforce:
             let isAuth = salesforceOAuthManager.isAuthenticated
-            if isAuth {
+            if isAuth && isConnected {
+                // If we're already connected, show connected status immediately
+                connectionStatus = "Connected to Salesforce"
+                print("Debug: SystemManager - Salesforce status: \(connectionStatus), isConnected: \(isConnected)")
+            } else if isAuth {
+                // If authenticated but not yet connected, validate token
                 Task {
                     do {
                         let _ = try await salesforceOAuthManager.getValidAccessToken()
                         await MainActor.run {
                             connectionStatus = "Connected to Salesforce"
                             isConnected = true
+                            print("Debug: SystemManager - Salesforce status updated to: \(connectionStatus)")
                         }
                     } catch {
                         await MainActor.run {
                             connectionStatus = "Salesforce Token Expired"
                             isConnected = false
+                            print("Debug: SystemManager - Salesforce token expired: \(error)")
                         }
                     }
                 }
             } else {
                 connectionStatus = "Salesforce Not Authenticated"
                 isConnected = false
+                print("Debug: SystemManager - Salesforce status: \(connectionStatus), isConnected: \(isConnected)")
             }
-            print("Debug: SystemManager - Salesforce status: \(connectionStatus), isConnected: \(isConnected)")
         }
     }
     
