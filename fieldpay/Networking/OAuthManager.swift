@@ -54,9 +54,10 @@ class OAuthManager: ObservableObject {
             return
         }
         
-        // Validate account ID format (should be numeric)
-        guard accountId.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) == nil else {
-            print("Debug: ERROR - Account ID should contain only digits")
+        // Validate account ID format (should be numeric for production, alphanumeric for sandbox)
+        let accountIdCharacterSet = CharacterSet.alphanumerics
+        guard accountId.rangeOfCharacter(from: accountIdCharacterSet.inverted) == nil else {
+            print("Debug: ERROR - Account ID should contain only alphanumeric characters")
             return
         }
         
@@ -111,7 +112,7 @@ class OAuthManager: ObservableObject {
         print("Debug: - Redirect URI valid: \(hasRedirectUri)")
         
         // Validate account ID format
-        let accountIdValid = accountId.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) == nil
+        let accountIdValid = accountId.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) == nil
         print("Debug: - Account ID format valid: \(accountIdValid)")
         
         // Validate client ID format
