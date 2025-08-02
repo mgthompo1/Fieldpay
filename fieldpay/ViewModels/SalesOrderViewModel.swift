@@ -17,8 +17,8 @@ class SalesOrderViewModel: ObservableObject {
     }
     
     func loadSalesOrders() {
-        // Check if OAuth is configured before making API calls
-        guard OAuthManager.shared.isAuthenticated else {
+        // Check if NetSuite is configured before making API calls
+        guard netSuiteAPI.isConfigured() else {
             errorMessage = "Please configure NetSuite OAuth first"
             return
         }
@@ -29,6 +29,28 @@ class SalesOrderViewModel: ObservableObject {
         Task {
             do {
                 let fetchedSalesOrders = try await netSuiteAPI.fetchSalesOrders()
+                salesOrders = fetchedSalesOrders
+                isLoading = false
+            } catch {
+                errorMessage = error.localizedDescription
+                isLoading = false
+            }
+        }
+    }
+    
+    func loadSalesOrdersForCustomer(_ customerId: String) {
+        // Check if NetSuite is configured before making API calls
+        guard netSuiteAPI.isConfigured() else {
+            errorMessage = "Please configure NetSuite OAuth first"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                let fetchedSalesOrders = try await netSuiteAPI.fetchCustomerSalesOrders(for: customerId)
                 salesOrders = fetchedSalesOrders
                 isLoading = false
             } catch {

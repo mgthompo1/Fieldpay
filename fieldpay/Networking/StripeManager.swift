@@ -61,6 +61,12 @@ class StripeManager: ObservableObject {
     
     // MARK: - Payment Processing
     func createPaymentIntent(amount: Int, currency: String = "usd", customerId: String? = nil) async throws -> PaymentIntent {
+        guard !secretKey.isEmpty else {
+            print("Debug: StripeManager - Secret key not configured")
+            throw StripeError.notConfigured
+        }
+        
+        print("Debug: StripeManager - Creating payment intent for amount: \(amount)")
         let endpoint = "/payment_intents"
         let url = URL(string: baseURL + endpoint)!
         
@@ -83,8 +89,18 @@ class StripeManager: ObservableObject {
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("Debug: StripeManager - Invalid HTTP response for payment intent")
+            throw StripeError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            print("Debug: StripeManager - Payment intent HTTP error \(httpResponse.statusCode)")
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = errorData["error"] as? [String: Any],
+               let message = error["message"] as? String {
+                print("Debug: StripeManager - Stripe payment intent error: \(message)")
+            }
             throw StripeError.requestFailed
         }
         
@@ -116,6 +132,12 @@ class StripeManager: ObservableObject {
     }
     
     func createCustomer(email: String, name: String? = nil) async throws -> StripeCustomer {
+        guard !secretKey.isEmpty else {
+            print("Debug: StripeManager - Secret key not configured for customer creation")
+            throw StripeError.notConfigured
+        }
+        
+        print("Debug: StripeManager - Creating customer with email: \(email)")
         let endpoint = "/customers"
         let url = URL(string: baseURL + endpoint)!
         
@@ -177,6 +199,151 @@ class StripeManager: ObservableObject {
         return paymentMethod
     }
     
+    func createCardToken(cardNumber: String, expMonth: Int, expYear: Int, cvc: String) async throws -> String {
+        guard !secretKey.isEmpty else {
+            print("Debug: StripeManager - Secret key not configured for card token creation")
+            throw StripeError.notConfigured
+        }
+        
+        print("Debug: StripeManager - Creating card token")
+        let endpoint = "/tokens"
+        let url = URL(string: baseURL + endpoint)!
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(secretKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        var bodyComponents = URLComponents()
+        bodyComponents.queryItems = [
+            URLQueryItem(name: "card[number]", value: cardNumber),
+            URLQueryItem(name: "card[exp_month]", value: "\(expMonth)"),
+            URLQueryItem(name: "card[exp_year]", value: "\(expYear)"),
+            URLQueryItem(name: "card[cvc]", value: cvc)
+        ]
+        
+        request.httpBody = bodyComponents.query?.data(using: .utf8)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw StripeError.requestFailed
+        }
+        
+        let tokenResponse = try JSONDecoder().decode(CardTokenResponse.self, from: data)
+        return tokenResponse.id
+    }
+    
+    func attachPaymentMethodToCustomer(paymentMethodId: String, customerId: String) async throws {
+        let endpoint = "/payment_methods/\(paymentMethodId)/attach"
+        let url = URL(string: baseURL + endpoint)!
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(secretKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let body = "customer=\(customerId)"
+        request.httpBody = body.data(using: .utf8)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw StripeError.requestFailed
+        }
+    }
+    
+    // MARK: - Stripe Checkout (Hosted Payment Page)
+    func createCheckoutSession(amount: Decimal, currency: String = "usd", customerEmail: String, customerName: String, merchantReference: String) async throws -> StripeCheckoutSession {
+        guard !secretKey.isEmpty else {
+            print("Debug: StripeManager - Secret key not configured for checkout session")
+            throw StripeError.notConfigured
+        }
+        
+        print("Debug: StripeManager - Creating Stripe Checkout session for amount: \(amount)")
+        
+        let endpoint = "/checkout/sessions"
+        let url = URL(string: baseURL + endpoint)!
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(secretKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        // Convert amount to cents
+        let amountInCents = Int((amount as NSDecimalNumber).doubleValue * 100)
+        
+        var bodyComponents = URLComponents()
+        bodyComponents.queryItems = [
+            URLQueryItem(name: "payment_method_types[]", value: "card"),
+            URLQueryItem(name: "line_items[0][price_data][currency]", value: currency),
+            URLQueryItem(name: "line_items[0][price_data][product_data][name]", value: "Payment to \(customerName)"),
+            URLQueryItem(name: "line_items[0][price_data][unit_amount]", value: "\(amountInCents)"),
+            URLQueryItem(name: "line_items[0][quantity]", value: "1"),
+            URLQueryItem(name: "mode", value: "payment"),
+            URLQueryItem(name: "success_url", value: "https://httpbin.org/get?status=success&session_id={CHECKOUT_SESSION_ID}"),
+            URLQueryItem(name: "cancel_url", value: "https://httpbin.org/get?status=cancelled&session_id={CHECKOUT_SESSION_ID}"),
+            URLQueryItem(name: "customer_email", value: customerEmail),
+            URLQueryItem(name: "metadata[merchant_reference]", value: merchantReference)
+        ]
+        
+        request.httpBody = bodyComponents.query?.data(using: .utf8)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("Debug: StripeManager - Invalid HTTP response for checkout session")
+            throw StripeError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            print("Debug: StripeManager - Checkout session HTTP error \(httpResponse.statusCode)")
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("Debug: StripeManager - Stripe checkout error: \(errorData)")
+            }
+            throw StripeError.requestFailed
+        }
+        
+        let checkoutSession = try JSONDecoder().decode(StripeCheckoutSession.self, from: data)
+        print("Debug: StripeManager - Checkout session created successfully: \(checkoutSession.id)")
+        return checkoutSession
+    }
+    
+    /// Check the status of a Stripe Checkout session
+    func checkCheckoutSessionStatus(sessionId: String) async throws -> StripeCheckoutSessionStatus {
+        guard !secretKey.isEmpty else {
+            print("Debug: StripeManager - Secret key not configured for session status check")
+            throw StripeError.notConfigured
+        }
+        
+        print("Debug: StripeManager - Checking Stripe Checkout session status for: \(sessionId)")
+        
+        let endpoint = "/checkout/sessions/\(sessionId)"
+        let url = URL(string: baseURL + endpoint)!
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(secretKey)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("Debug: StripeManager - Invalid HTTP response for session status")
+            throw StripeError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            print("Debug: StripeManager - Session status HTTP error \(httpResponse.statusCode)")
+            throw StripeError.requestFailed
+        }
+        
+        let sessionStatus = try JSONDecoder().decode(StripeCheckoutSessionStatus.self, from: data)
+        print("Debug: StripeManager - Stripe session status: \(sessionStatus.paymentStatus)")
+        return sessionStatus
+    }
+    
     // MARK: - Tap to Pay (for iOS)
     func setupTapToPay() async throws {
         // This would integrate with Stripe's Tap to Pay SDK
@@ -232,6 +399,82 @@ struct PaymentMethod: Codable {
             case expMonth = "exp_month"
             case expYear = "exp_year"
         }
+    }
+}
+
+struct CardTokenResponse: Codable {
+    let id: String
+    let type: String
+    let card: CardTokenDetails?
+    
+    struct CardTokenDetails: Codable {
+        let brand: String
+        let last4: String
+        let expMonth: Int
+        let expYear: Int
+        
+        enum CodingKeys: String, CodingKey {
+            case brand
+            case last4
+            case expMonth = "exp_month"
+            case expYear = "exp_year"
+        }
+    }
+}
+
+// MARK: - Stripe Checkout Models
+struct StripeCheckoutSession: Codable {
+    let id: String
+    let object: String
+    let url: String?
+    let paymentStatus: String
+    let status: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case object
+        case url
+        case paymentStatus = "payment_status"
+        case status
+    }
+}
+
+struct StripeCheckoutSessionStatus: Codable {
+    let id: String
+    let object: String
+    let paymentStatus: String
+    let status: String
+    let amountTotal: Int?
+    let currency: String?
+    let customerEmail: String?
+    let paymentIntentId: String?
+    let metadata: [String: String]?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case object
+        case paymentStatus = "payment_status"
+        case status
+        case amountTotal = "amount_total"
+        case currency
+        case customerEmail = "customer_email"
+        case paymentIntentId = "payment_intent"
+        case metadata
+    }
+    
+    /// Check if payment was completed successfully
+    var isCompleted: Bool {
+        return paymentStatus == "paid"
+    }
+    
+    /// Check if session is still open
+    var isOpen: Bool {
+        return status == "open"
+    }
+    
+    /// Check if session expired
+    var isExpired: Bool {
+        return status == "expired"
     }
 }
 

@@ -73,23 +73,29 @@ class OAuthManager: ObservableObject {
         self.accountId = accountId
         self.redirectUri = redirectUri
         
-        // Store in UserDefaults
-        UserDefaults.standard.set(clientId, forKey: "netsuite_client_id")
-        UserDefaults.standard.set(clientSecret, forKey: "netsuite_client_secret")
-        UserDefaults.standard.set(accountId, forKey: "netsuite_account_id")
-        UserDefaults.standard.set(redirectUri, forKey: "netsuite_redirect_uri")
+        // Store securely in Keychain
+        let keychainWrapper = KeychainWrapper.shared
+        let configSaved = keychainWrapper.saveNetSuiteConfiguration(
+            accountId: accountId,
+            clientId: clientId,
+            clientSecret: clientSecret,
+            redirectUri: redirectUri
+        )
+        
+        if configSaved {
+            print("Debug: ✅ Configuration stored securely in Keychain")
+        } else {
+            print("Debug: ❌ Failed to store configuration in Keychain")
+        }
         
         // Verify configuration was stored correctly
-        let storedClientId = UserDefaults.standard.string(forKey: "netsuite_client_id")
-        let storedClientSecret = UserDefaults.standard.string(forKey: "netsuite_client_secret")
-        let storedAccountId = UserDefaults.standard.string(forKey: "netsuite_account_id")
-        let storedRedirectUri = UserDefaults.standard.string(forKey: "netsuite_redirect_uri")
+        let storedConfig = keychainWrapper.loadNetSuiteConfiguration()
         
         print("Debug: Configuration storage verification:")
-        print("Debug: Client ID stored: \(storedClientId != nil)")
-        print("Debug: Client Secret stored: \(storedClientSecret != nil)")
-        print("Debug: Account ID stored: \(storedAccountId != nil)")
-        print("Debug: Redirect URI stored: \(storedRedirectUri != nil)")
+        print("Debug: Client ID stored: \(storedConfig.clientId != nil)")
+        print("Debug: Client Secret stored: \(storedConfig.clientSecret != nil)")
+        print("Debug: Account ID stored: \(storedConfig.accountId != nil)")
+        print("Debug: Redirect URI stored: \(storedConfig.redirectUri != nil)")
         
         print("Debug: ✅ OAuth configuration updated successfully")
         print("OAuth configured for NetSuite account: \(accountId)")
@@ -141,12 +147,15 @@ class OAuthManager: ObservableObject {
     private func loadConfiguration() {
         print("Debug: OAuthManager.loadConfiguration() called")
         
-        clientId = UserDefaults.standard.string(forKey: "netsuite_client_id") ?? ""
-        clientSecret = UserDefaults.standard.string(forKey: "netsuite_client_secret") ?? ""
-        accountId = UserDefaults.standard.string(forKey: "netsuite_account_id") ?? ""
-        redirectUri = UserDefaults.standard.string(forKey: "netsuite_redirect_uri") ?? "fieldpay://callback"
+        let keychainWrapper = KeychainWrapper.shared
+        let config = keychainWrapper.loadNetSuiteConfiguration()
         
-        print("Debug: Loaded configuration:")
+        clientId = config.clientId ?? ""
+        clientSecret = config.clientSecret ?? ""
+        accountId = config.accountId ?? ""
+        redirectUri = config.redirectUri ?? "fieldpay://callback"
+        
+        print("Debug: Loaded configuration from Keychain:")
         print("Debug: - clientId: '\(clientId)' (length: \(clientId.count))")
         print("Debug: - clientSecret: '\(clientSecret)' (length: \(clientSecret.count))")
         print("Debug: - accountId: '\(accountId)' (length: \(accountId.count))")
@@ -665,13 +674,21 @@ class OAuthManager: ObservableObject {
         
         let userDefaults = UserDefaults.standard
         
-        // Store tokens
-        userDefaults.set(accessToken, forKey: "netsuite_access_token")
-        userDefaults.set(refreshToken, forKey: "netsuite_refresh_token")
-        
-        // Calculate and store expiry time (NetSuite tokens typically expire in 1 hour)
-        let expiryDate = Date().addingTimeInterval(3600) // 1 hour from now
-        userDefaults.set(expiryDate, forKey: "netsuite_token_expiry")
+        // Ensure we're on the main thread for UserDefaults operations
+        await MainActor.run {
+            // Store tokens with immediate synchronization
+            userDefaults.set(accessToken, forKey: "netsuite_access_token")
+            userDefaults.set(refreshToken, forKey: "netsuite_refresh_token")
+            
+            // Calculate and store expiry time (NetSuite tokens typically expire in 1 hour)
+            let expiryDate = Date().addingTimeInterval(3600) // 1 hour from now
+            userDefaults.set(expiryDate, forKey: "netsuite_token_expiry")
+            
+            // Force immediate synchronization
+            userDefaults.synchronize()
+            
+            print("Debug: Tokens stored with synchronize() called")
+        }
         
         // Update internal state
         DispatchQueue.main.async {
@@ -679,6 +696,9 @@ class OAuthManager: ObservableObject {
             self.refreshToken = refreshToken
             self.isAuthenticated = true
         }
+        
+        // Wait a moment for UserDefaults to sync
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Verify tokens were stored correctly
         let storedAccessToken = userDefaults.string(forKey: "netsuite_access_token")
@@ -695,18 +715,25 @@ class OAuthManager: ObservableObject {
         // Verify token integrity
         guard let storedAccessToken = storedAccessToken,
               let storedRefreshToken = storedRefreshToken,
-              let storedExpiry = storedExpiry else {
+              let _ = storedExpiry else {
             print("Debug: ERROR - Token storage verification failed!")
+            print("Debug: storedAccessToken: \(storedAccessToken != nil)")
+            print("Debug: storedRefreshToken: \(storedRefreshToken != nil)")
+            print("Debug: storedExpiry: \(storedExpiry != nil)")
             throw OAuthError.tokenExchangeFailed
         }
         
         guard storedAccessToken == accessToken else {
             print("Debug: ERROR - Stored access token doesn't match original!")
+            print("Debug: Original: \(accessToken.prefix(10))...")
+            print("Debug: Stored: \(storedAccessToken.prefix(10))...")
             throw OAuthError.tokenExchangeFailed
         }
         
         guard storedRefreshToken == refreshToken else {
             print("Debug: ERROR - Stored refresh token doesn't match original!")
+            print("Debug: Original: \(refreshToken.prefix(10))...")
+            print("Debug: Stored: \(storedRefreshToken.prefix(10))...")
             throw OAuthError.tokenExchangeFailed
         }
         
@@ -720,21 +747,35 @@ class OAuthManager: ObservableObject {
         
         print("Debug: NetSuiteAPI configured with account ID: \(accountId) and access token")
         
+        // Verify NetSuiteAPI configuration immediately
+        let isConfigured = NetSuiteAPI.shared.isConfigured()
+        print("Debug: NetSuiteAPI configuration verification: \(isConfigured)")
+        
+        if !isConfigured {
+            print("Debug: ERROR - NetSuiteAPI not properly configured after token storage!")
+            throw OAuthError.tokenExchangeFailed
+        }
+        
         // Clear OAuth session data (code verifier, state) but keep tokens
         userDefaults.removeObject(forKey: "netsuite_code_verifier")
         userDefaults.removeObject(forKey: "netsuite_oauth_state")
+        userDefaults.synchronize()
         print("Debug: OAuth session data cleared after successful token exchange")
+        
+        print("Debug: ✅ Token storage and configuration completed successfully")
     }
     
     private func clearAllTokens() async {
         print("Debug: ===== clearAllTokens() called =====")
         
-        let userDefaults = UserDefaults.standard
+        let keychainWrapper = KeychainWrapper.shared
         
-        // Clear all OAuth-related data
-        userDefaults.removeObject(forKey: "netsuite_access_token")
-        userDefaults.removeObject(forKey: "netsuite_refresh_token")
-        userDefaults.removeObject(forKey: "netsuite_token_expiry")
+        // Clear all OAuth-related data from Keychain
+        let tokensCleared = keychainWrapper.clearNetSuiteTokens()
+        let configCleared = keychainWrapper.clearNetSuiteConfiguration()
+        
+        // Clear OAuth session data from UserDefaults (these are temporary)
+        let userDefaults = UserDefaults.standard
         userDefaults.removeObject(forKey: "netsuite_code_verifier")
         userDefaults.removeObject(forKey: "netsuite_oauth_state")
         
@@ -745,28 +786,40 @@ class OAuthManager: ObservableObject {
             self.isAuthenticated = false
         }
         
-        print("Debug: All OAuth tokens and session data cleared")
+        if tokensCleared && configCleared {
+            print("Debug: ✅ All OAuth tokens and configuration cleared from Keychain")
+        } else {
+            print("Debug: ⚠️ Some OAuth data may not have been cleared from Keychain")
+        }
+        print("Debug: OAuth session data cleared from UserDefaults")
         print("Debug: Internal state reset to unauthenticated")
     }
     
     private func clearStoredTokens() async {
-        // Clear tokens from UserDefaults
+        // Clear tokens from Keychain
+        let keychainWrapper = KeychainWrapper.shared
+        let tokensCleared = keychainWrapper.clearNetSuiteTokens()
+        
+        // Clear OAuth session data from UserDefaults (these are temporary)
         let userDefaults = UserDefaults.standard
-        userDefaults.removeObject(forKey: "netsuite_access_token")
-        userDefaults.removeObject(forKey: "netsuite_refresh_token")
-        userDefaults.removeObject(forKey: "netsuite_token_expiry")
         userDefaults.removeObject(forKey: "netsuite_code_verifier")
         userDefaults.removeObject(forKey: "netsuite_oauth_state")
         
-        print("Debug: OAuth tokens and session data cleared from storage")
+        if tokensCleared {
+            print("Debug: ✅ OAuth tokens cleared from Keychain")
+        } else {
+            print("Debug: ⚠️ Some OAuth tokens may not have been cleared from Keychain")
+        }
+        print("Debug: OAuth session data cleared from UserDefaults")
     }
     
     private func clearStoredTokensAndState() async {
-        // Clear tokens from UserDefaults
+        // Clear tokens from Keychain
+        let keychainWrapper = KeychainWrapper.shared
+        let tokensCleared = keychainWrapper.clearNetSuiteTokens()
+        
+        // Clear OAuth session data from UserDefaults (these are temporary)
         let userDefaults = UserDefaults.standard
-        userDefaults.removeObject(forKey: "netsuite_access_token")
-        userDefaults.removeObject(forKey: "netsuite_refresh_token")
-        userDefaults.removeObject(forKey: "netsuite_token_expiry")
         userDefaults.removeObject(forKey: "netsuite_code_verifier")
         userDefaults.removeObject(forKey: "netsuite_oauth_state")
         
@@ -777,19 +830,22 @@ class OAuthManager: ObservableObject {
             self.isAuthenticated = false
         }
         
-        print("Debug: OAuth tokens and session data cleared from storage and internal state reset")
+        if tokensCleared {
+            print("Debug: ✅ OAuth tokens cleared from Keychain")
+        } else {
+            print("Debug: ⚠️ Some OAuth tokens may not have been cleared from Keychain")
+        }
+        print("Debug: OAuth session data cleared from UserDefaults")
+        print("Debug: Internal state reset")
     }
     
     func forceFreshOAuthFlow() async {
         print("Debug: Force clearing all OAuth data for fresh flow")
         await clearStoredTokens()
         
-        // Clear any other OAuth-related data
-        let userDefaults = UserDefaults.standard
-        userDefaults.removeObject(forKey: "netsuite_client_id")
-        userDefaults.removeObject(forKey: "netsuite_client_secret")
-        userDefaults.removeObject(forKey: "netsuite_account_id")
-        userDefaults.removeObject(forKey: "netsuite_redirect_uri")
+        // Clear configuration from Keychain
+        let keychainWrapper = KeychainWrapper.shared
+        let configCleared = keychainWrapper.clearNetSuiteConfiguration()
         
         // Reset authentication state
         DispatchQueue.main.async {
@@ -798,18 +854,33 @@ class OAuthManager: ObservableObject {
             self.refreshToken = nil
         }
         
+        if configCleared {
+            print("Debug: ✅ All OAuth configuration cleared from Keychain")
+        } else {
+            print("Debug: ⚠️ Some OAuth configuration may not have been cleared from Keychain")
+        }
         print("Debug: All OAuth data cleared, ready for fresh flow")
     }
     
     func loadStoredTokens() async {
         print("Debug: ===== loadStoredTokens() called =====")
         
-        // Load tokens from UserDefaults
-        let userDefaults = UserDefaults.standard
+        // Load tokens from Keychain
+        let keychainWrapper = KeychainWrapper.shared
+        let tokens = keychainWrapper.loadNetSuiteTokens()
         
-        if let accessToken = userDefaults.string(forKey: "netsuite_access_token"),
-           let refreshToken = userDefaults.string(forKey: "netsuite_refresh_token"),
-           let expiryDate = userDefaults.object(forKey: "netsuite_token_expiry") as? Date {
+        let accessToken = tokens.accessToken
+        let refreshToken = tokens.refreshToken
+        let expiryDate = tokens.expiryDate
+        
+        print("Debug: Keychain read results:")
+        print("Debug: Access token present: \(accessToken != nil)")
+        print("Debug: Refresh token present: \(refreshToken != nil)")
+        print("Debug: Expiry date present: \(expiryDate != nil)")
+        
+        if let accessToken = accessToken,
+           let refreshToken = refreshToken,
+           let expiryDate = expiryDate {
             
             print("Debug: Found stored tokens:")
             print("Debug: Access token: \(accessToken.prefix(10))... (length: \(accessToken.count))")
@@ -821,12 +892,14 @@ class OAuthManager: ObservableObject {
             // Validate token format and length
             guard accessToken.count > 10 else {
                 print("Debug: ERROR - Stored access token is too short, likely invalid")
+                print("Debug: Access token length: \(accessToken.count)")
                 await clearStoredTokens()
                 return
             }
             
             guard refreshToken.count > 10 else {
                 print("Debug: ERROR - Stored refresh token is too short, likely invalid")
+                print("Debug: Refresh token length: \(refreshToken.count)")
                 await clearStoredTokens()
                 return
             }
@@ -844,13 +917,31 @@ class OAuthManager: ObservableObject {
                 // Configure NetSuiteAPI with loaded tokens
                 NetSuiteAPI.shared.configure(accountId: accountId, accessToken: accessToken)
                 print("Debug: NetSuiteAPI configured with loaded tokens")
+                
+                // Verify NetSuiteAPI configuration
+                let isConfigured = NetSuiteAPI.shared.isConfigured()
+                print("Debug: NetSuiteAPI configuration verification after loading: \(isConfigured)")
+                
+                if !isConfigured {
+                    print("Debug: ERROR - NetSuiteAPI not properly configured after loading tokens!")
+                    await clearStoredTokens()
+                    DispatchQueue.main.async {
+                        self.isAuthenticated = false
+                        self.accessToken = nil
+                        self.refreshToken = nil
+                    }
+                    return
+                }
+                
                 print("Debug: Loaded valid OAuth tokens from storage")
                 print("Debug: Access token: \(accessToken.prefix(10))...")
                 print("Debug: Token expires: \(expiryDate)")
+                print("Debug: ✅ Token loading and configuration successful")
             } else {
                 print("Debug: ERROR - Stored OAuth tokens are expired")
                 print("Debug: Token expired at: \(expiryDate)")
                 print("Debug: Current time: \(Date())")
+                print("Debug: Time difference: \(Date().timeIntervalSince(expiryDate)) seconds")
                 // Clear expired tokens
                 await clearStoredTokens()
                 
@@ -862,9 +953,23 @@ class OAuthManager: ObservableObject {
             }
         } else {
             print("Debug: No stored OAuth tokens found or tokens are incomplete")
-            print("Debug: Access token present: \(userDefaults.string(forKey: "netsuite_access_token") != nil)")
-            print("Debug: Refresh token present: \(userDefaults.string(forKey: "netsuite_refresh_token") != nil)")
-            print("Debug: Expiry date present: \(userDefaults.object(forKey: "netsuite_token_expiry") != nil)")
+            print("Debug: Access token present: \(accessToken != nil)")
+            print("Debug: Refresh token present: \(refreshToken != nil)")
+            print("Debug: Expiry date present: \(expiryDate != nil)")
+            
+            // Additional debugging - check what's actually in Keychain
+            let keychainWrapper = KeychainWrapper.shared
+            let storedConfig = keychainWrapper.loadNetSuiteConfiguration()
+            let storedTokens = keychainWrapper.loadNetSuiteTokens()
+            
+            print("Debug: All NetSuite-related Keychain data:")
+            print("Debug:   Account ID: \(storedConfig.accountId ?? "nil")")
+            print("Debug:   Client ID: \(storedConfig.clientId?.prefix(10) ?? "nil")...")
+            print("Debug:   Client Secret: \(storedConfig.clientSecret?.prefix(10) ?? "nil")...")
+            print("Debug:   Redirect URI: \(storedConfig.redirectUri ?? "nil")")
+            print("Debug:   Access Token: \(storedTokens.accessToken?.prefix(10) ?? "nil")...")
+            print("Debug:   Refresh Token: \(storedTokens.refreshToken?.prefix(10) ?? "nil")...")
+            print("Debug:   Expiry Date: \(storedTokens.expiryDate?.description ?? "nil")")
             
             DispatchQueue.main.async {
                 self.isAuthenticated = false
@@ -889,12 +994,13 @@ class OAuthManager: ObservableObject {
     func validateAuthenticationState() async {
         print("Debug: ===== validateAuthenticationState() called =====")
         
-        let userDefaults = UserDefaults.standard
+        let keychainWrapper = KeychainWrapper.shared
+        let tokens = keychainWrapper.loadNetSuiteTokens()
         
         // Check if we have stored tokens
-        if let accessToken = userDefaults.string(forKey: "netsuite_access_token"),
-           let refreshToken = userDefaults.string(forKey: "netsuite_refresh_token"),
-           let expiryDate = userDefaults.object(forKey: "netsuite_token_expiry") as? Date {
+        if let accessToken = tokens.accessToken,
+           let refreshToken = tokens.refreshToken,
+           let expiryDate = tokens.expiryDate {
             
             print("Debug: Found stored tokens:")
             print("Debug: Access token: \(accessToken.prefix(10))... (length: \(accessToken.count))")
@@ -969,9 +1075,11 @@ class OAuthManager: ObservableObject {
             }
             
             // Check if we have required OAuth configuration
-            let clientId = userDefaults.string(forKey: "netsuite_client_id") ?? ""
-            let clientSecret = userDefaults.string(forKey: "netsuite_client_secret") ?? ""
-            let accountId = userDefaults.string(forKey: "netsuite_account_id") ?? ""
+            let keychainWrapper = KeychainWrapper.shared
+            let config = keychainWrapper.loadNetSuiteConfiguration()
+            let clientId = config.clientId ?? ""
+            let clientSecret = config.clientSecret ?? ""
+            let accountId = config.accountId ?? ""
             
             print("Debug: OAuth configuration check:")
             print("Debug: Client ID present: \(!clientId.isEmpty)")
@@ -1019,9 +1127,11 @@ class OAuthManager: ObservableObject {
             
         } else {
             print("Debug: No stored tokens found")
-            print("Debug: Access token present: \(userDefaults.string(forKey: "netsuite_access_token") != nil)")
-            print("Debug: Refresh token present: \(userDefaults.string(forKey: "netsuite_refresh_token") != nil)")
-            print("Debug: Token expiry present: \(userDefaults.object(forKey: "netsuite_token_expiry") != nil)")
+            let keychainWrapper = KeychainWrapper.shared
+            let tokens = keychainWrapper.loadNetSuiteTokens()
+            print("Debug: Access token present: \(tokens.accessToken != nil)")
+            print("Debug: Refresh token present: \(tokens.refreshToken != nil)")
+            print("Debug: Token expiry present: \(tokens.expiryDate != nil)")
             
             DispatchQueue.main.async {
                 self.isAuthenticated = false
@@ -1033,23 +1143,15 @@ class OAuthManager: ObservableObject {
     func forceClearAllOAuthData() async {
         print("Debug: ===== forceClearAllOAuthData() called =====")
         
-        // Clear all OAuth-related data
+        // Clear all OAuth-related data from Keychain
+        let keychainWrapper = KeychainWrapper.shared
+        let tokensCleared = keychainWrapper.clearNetSuiteTokens()
+        let configCleared = keychainWrapper.clearNetSuiteConfiguration()
+        
+        // Clear OAuth session data from UserDefaults (these are temporary)
         let userDefaults = UserDefaults.standard
-        
-        // Clear tokens
-        userDefaults.removeObject(forKey: "netsuite_access_token")
-        userDefaults.removeObject(forKey: "netsuite_refresh_token")
-        userDefaults.removeObject(forKey: "netsuite_token_expiry")
-        
-        // Clear OAuth session data
         userDefaults.removeObject(forKey: "netsuite_code_verifier")
         userDefaults.removeObject(forKey: "netsuite_oauth_state")
-        
-        // Clear configuration (optional - comment out if you want to keep credentials)
-        // userDefaults.removeObject(forKey: "netsuite_client_id")
-        // userDefaults.removeObject(forKey: "netsuite_client_secret")
-        // userDefaults.removeObject(forKey: "netsuite_account_id")
-        // userDefaults.removeObject(forKey: "netsuite_redirect_uri")
         
         // Reset authentication state
         DispatchQueue.main.async {
@@ -1058,20 +1160,27 @@ class OAuthManager: ObservableObject {
             self.refreshToken = nil
         }
         
-        print("Debug: All OAuth data cleared")
+        if tokensCleared && configCleared {
+            print("Debug: ✅ All OAuth data cleared from Keychain")
+        } else {
+            print("Debug: ⚠️ Some OAuth data may not have been cleared from Keychain")
+        }
+        print("Debug: OAuth session data cleared from UserDefaults")
     }
     
     // MARK: - OAuth Flow Verification
     func verifyOAuthFlow() async -> Bool {
         print("Debug: ===== verifyOAuthFlow() called =====")
         
-        let userDefaults = UserDefaults.standard
+        let keychainWrapper = KeychainWrapper.shared
+        let config = keychainWrapper.loadNetSuiteConfiguration()
+        let tokens = keychainWrapper.loadNetSuiteTokens()
         
         // Check OAuth configuration
-        let clientId = userDefaults.string(forKey: "netsuite_client_id") ?? ""
-        let clientSecret = userDefaults.string(forKey: "netsuite_client_secret") ?? ""
-        let accountId = userDefaults.string(forKey: "netsuite_account_id") ?? ""
-        let redirectUri = userDefaults.string(forKey: "netsuite_redirect_uri") ?? ""
+        let clientId = config.clientId ?? ""
+        let clientSecret = config.clientSecret ?? ""
+        let accountId = config.accountId ?? ""
+        let redirectUri = config.redirectUri ?? ""
         
         print("Debug: OAuth Configuration Check:")
         print("Debug: - Client ID: \(clientId.isEmpty ? "❌ Missing" : "✅ Present")")
@@ -1080,9 +1189,9 @@ class OAuthManager: ObservableObject {
         print("Debug: - Redirect URI: \(redirectUri.isEmpty ? "❌ Missing" : "✅ Present")")
         
         // Check stored tokens
-        let accessToken = userDefaults.string(forKey: "netsuite_access_token")
-        let refreshToken = userDefaults.string(forKey: "netsuite_refresh_token")
-        let expiryDate = userDefaults.object(forKey: "netsuite_token_expiry") as? Date
+        let accessToken = tokens.accessToken
+        let refreshToken = tokens.refreshToken
+        let expiryDate = tokens.expiryDate
         
         print("Debug: Token Status Check:")
         print("Debug: - Access Token: \(accessToken == nil ? "❌ Missing" : "✅ Present")")

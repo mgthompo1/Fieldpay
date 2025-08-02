@@ -23,10 +23,11 @@ class SettingsViewModel: ObservableObject {
     @Published var windcaveApiKey = ""
     @Published var isWindcaveConnected = false
     
-    // Xero Settings
-    @Published var xeroClientId = ""
-    @Published var xeroClientSecret = ""
-    @Published var isXeroAuthenticated = false
+    // Company Branding
+    @Published var companyLogoData: Data?
+    @Published var companyName = ""
+    
+
     
     // QuickBooks Settings
     @Published var quickBooksClientId = ""
@@ -45,12 +46,15 @@ class SettingsViewModel: ObservableObject {
     @Published var isSystemConnected = false
     @Published var systemConnectionStatus = "Not Connected"
     
+    // Payment System Selection
+    @Published var selectedPaymentSystem: PaymentSystem = .none
+    
     @Published var isLoading = false
     @Published var errorMessage: String?
     
     private let userDefaults = UserDefaults.standard
     private let oAuthManager = OAuthManager.shared
-    private let xeroOAuthManager = XeroOAuthManager.shared
+
     private let quickBooksOAuthManager = QuickBooksOAuthManager.shared
     private let salesforceOAuthManager = SalesforceOAuthManager.shared
     private let systemManager = SystemManager.shared
@@ -60,6 +64,61 @@ class SettingsViewModel: ObservableObject {
     init() {
         loadSettings()
         checkConnectionStatus()
+        loadPaymentSystemSelection()
+    }
+    
+    // MARK: - Payment System Management
+    
+    enum PaymentSystem: String, CaseIterable {
+        case none = "none"
+        case stripe = "stripe"
+        case windcave = "windcave"
+        
+        var displayName: String {
+            switch self {
+            case .none: return "None"
+            case .stripe: return "Stripe"
+            case .windcave: return "Windcave"
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .none: return "No payment system configured"
+            case .stripe: return "QR Code/Online payment processing"
+            case .windcave: return "Tap to Pay/Online Payments"
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .none: return "xmark.circle"
+            case .stripe: return "creditcard.fill"
+            case .windcave: return "wave.3.right"
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .none: return .gray
+            case .stripe: return .blue
+            case .windcave: return .purple
+            }
+        }
+    }
+    
+    func loadPaymentSystemSelection() {
+        if let savedSystem = userDefaults.string(forKey: "selected_payment_system"),
+           let system = PaymentSystem(rawValue: savedSystem) {
+            selectedPaymentSystem = system
+        } else {
+            selectedPaymentSystem = .none
+        }
+    }
+    
+    func savePaymentSystemSelection(_ system: PaymentSystem) {
+        selectedPaymentSystem = system
+        userDefaults.set(system.rawValue, forKey: "selected_payment_system")
     }
     
     // MARK: - Stripe Settings
@@ -230,6 +289,29 @@ class SettingsViewModel: ObservableObject {
         oAuthManager.clearTokens()
     }
     
+    func reconnectNetSuite() {
+        print("Debug: ===== reconnectNetSuite() called =====")
+        
+        // Clear current connection status
+        isNetSuiteConnected = false
+        netSuiteAccessToken = nil
+        tokenExpiryDate = nil
+        
+        // Clear stored tokens to force fresh OAuth flow
+        userDefaults.removeObject(forKey: "netsuite_access_token")
+        userDefaults.removeObject(forKey: "netsuite_refresh_token")
+        userDefaults.removeObject(forKey: "netsuite_token_expiry")
+        
+        // Clear OAuthManager tokens
+        oAuthManager.clearTokens()
+        
+        print("Debug: Cleared all NetSuite tokens and connection status")
+        print("Debug: Starting fresh OAuth flow...")
+        
+        // Start fresh OAuth flow
+        connectToNetSuite()
+    }
+    
     func handleOAuthCallback() {
         // This method will be called when OAuth callback is successful
         print("Debug: SettingsViewModel - OAuth callback handled, checking NetSuite connection...")
@@ -360,9 +442,17 @@ class SettingsViewModel: ObservableObject {
         windcaveUsername = userDefaults.string(forKey: "windcave_username") ?? ""
         windcaveApiKey = userDefaults.string(forKey: "windcave_api_key") ?? ""
         
-        // Load Xero settings
-        xeroClientId = userDefaults.string(forKey: "xero_client_id") ?? ""
-        xeroClientSecret = userDefaults.string(forKey: "xero_client_secret") ?? ""
+        // Update WindcaveManager with loaded credentials
+        if !windcaveUsername.isEmpty && !windcaveApiKey.isEmpty {
+            print("Debug: Configuring WindcaveManager with loaded credentials")
+            windcaveManager.updateConfiguration(username: windcaveUsername, apiKey: windcaveApiKey)
+        }
+        
+        // Load company branding settings
+        companyLogoData = userDefaults.data(forKey: "company_logo")
+        companyName = userDefaults.string(forKey: "company_name") ?? ""
+        
+
         
         // Load QuickBooks settings
         quickBooksClientId = userDefaults.string(forKey: "quickbooks_client_id") ?? ""
@@ -408,7 +498,7 @@ class SettingsViewModel: ObservableObject {
         checkStripeConnection()
         checkNetSuiteConnection()
         checkWindcaveConnection()
-        checkXeroAuthentication()
+
         checkQuickBooksAuthentication()
         checkSalesforceAuthentication()
         
@@ -432,6 +522,12 @@ class SettingsViewModel: ObservableObject {
         
         // Update WindcaveManager with new credentials
         windcaveManager.updateConfiguration(username: windcaveUsername, apiKey: windcaveApiKey)
+        
+        // Update connection status immediately since we now have configuration
+        if !windcaveUsername.isEmpty && !windcaveApiKey.isEmpty {
+            print("Debug: Windcave credentials saved, updating connection status")
+            isWindcaveConnected = windcaveManager.isConfigured
+        }
         
         checkWindcaveConnection()
     }
@@ -463,54 +559,30 @@ class SettingsViewModel: ObservableObject {
     }
     
     private func checkWindcaveConnection() {
+        // If not configured, don't show as connected
+        guard windcaveManager.isConfigured else {
+            isWindcaveConnected = false
+            print("Debug: Windcave not configured, setting connection to false")
+            return
+        }
+        
         Task {
             do {
                 let isValid = try await windcaveManager.testConnection()
                 await MainActor.run {
                     self.isWindcaveConnected = isValid
+                    print("Debug: Windcave connection test result: \(isValid)")
                 }
             } catch {
                 await MainActor.run {
                     self.isWindcaveConnected = false
+                    print("Debug: Windcave connection test failed: \(error)")
                 }
             }
         }
     }
     
-    // MARK: - Xero Settings
-    func saveXeroSettings() {
-        userDefaults.set(xeroClientId, forKey: "xero_client_id")
-        userDefaults.set(xeroClientSecret, forKey: "xero_client_secret")
-        xeroOAuthManager.updateConfiguration(clientId: xeroClientId, clientSecret: xeroClientSecret)
-        checkXeroAuthentication()
-    }
-    
-    func startXeroOAuth() {
-        isLoading = true
-        errorMessage = nil
-        
-        Task {
-            do {
-                let authURL = try await xeroOAuthManager.startOAuthFlow()
-                await MainActor.run {
-                    self.isLoading = false
-                    // Open Safari with auth URL
-                    if let url = URL(string: authURL) {
-                        UIApplication.shared.open(url)
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    self.errorMessage = error.localizedDescription
-                    self.isLoading = false
-                }
-            }
-        }
-    }
-    
-    private func checkXeroAuthentication() {
-        isXeroAuthenticated = xeroOAuthManager.isAuthenticated
-    }
+
     
     // MARK: - QuickBooks Settings
     func saveQuickBooksSettings() {
@@ -628,6 +700,24 @@ class SettingsViewModel: ObservableObject {
     
     func canConnectToSystem(_ system: AccountingSystem) -> Bool {
         return systemManager.canConnectToSystem(system)
+    }
+    
+    // MARK: - Company Branding Settings
+    
+    func saveCompanyBranding() {
+        if let logoData = companyLogoData {
+            userDefaults.set(logoData, forKey: "company_logo")
+        } else {
+            userDefaults.removeObject(forKey: "company_logo")
+        }
+        userDefaults.set(companyName, forKey: "company_name")
+        print("Debug: Company branding saved - Name: \(companyName), Logo: \(companyLogoData != nil ? "Present" : "None")")
+    }
+    
+    func clearCompanyLogo() {
+        companyLogoData = nil
+        userDefaults.removeObject(forKey: "company_logo")
+        print("Debug: Company logo cleared")
     }
 }
 

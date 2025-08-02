@@ -25,7 +25,7 @@ enum TokenHealthStatus {
 enum AccountingSystem: String, CaseIterable {
     case none = "none"
     case netsuite = "netsuite"
-    case xero = "xero"
+
     case quickbooks = "quickbooks"
     case salesforce = "salesforce"
     
@@ -33,7 +33,7 @@ enum AccountingSystem: String, CaseIterable {
         switch self {
         case .none: return "None (Standalone Mode)"
         case .netsuite: return "NetSuite"
-        case .xero: return "Xero"
+
         case .quickbooks: return "QuickBooks"
         case .salesforce: return "Salesforce"
         }
@@ -43,7 +43,7 @@ enum AccountingSystem: String, CaseIterable {
         switch self {
         case .none: return "building.2"
         case .netsuite: return "building.2.fill"
-        case .xero: return "x.circle.fill"
+
         case .quickbooks: return "q.circle.fill"
         case .salesforce: return "cloud.fill"
         }
@@ -53,7 +53,7 @@ enum AccountingSystem: String, CaseIterable {
         switch self {
         case .none: return .gray
         case .netsuite: return .green
-        case .xero: return .blue
+
         case .quickbooks: return .orange
         case .salesforce: return .purple
         }
@@ -70,7 +70,7 @@ class SystemManager: ObservableObject {
     
     private let userDefaults = UserDefaults.standard
     private let oAuthManager = OAuthManager.shared
-    private let xeroOAuthManager = XeroOAuthManager.shared
+
     private let quickBooksOAuthManager = QuickBooksOAuthManager.shared
     private let salesforceOAuthManager = SalesforceOAuthManager.shared
     
@@ -101,9 +101,7 @@ class SystemManager: ObservableObject {
             case .netsuite:
                 print("Debug: SystemManager - Connecting to NetSuite...")
                 try await connectToNetSuite()
-            case .xero:
-                print("Debug: SystemManager - Connecting to Xero...")
-                try await connectToXero()
+
             case .quickbooks:
                 print("Debug: SystemManager - Connecting to QuickBooks...")
                 try await connectToQuickBooks()
@@ -147,9 +145,7 @@ class SystemManager: ObservableObject {
         case .netsuite:
             print("Debug: SystemManager - Clearing NetSuite OAuth tokens")
             oAuthManager.clearTokens()
-        case .xero:
-            print("Debug: SystemManager - Clearing Xero OAuth tokens")
-            xeroOAuthManager.clearTokens()
+
         case .quickbooks:
             print("Debug: SystemManager - Clearing QuickBooks OAuth tokens")
             quickBooksOAuthManager.clearTokens()
@@ -220,22 +216,7 @@ class SystemManager: ObservableObject {
         isConnected = true
     }
     
-    private func connectToXero() async throws {
-        guard xeroOAuthManager.isAuthenticated else {
-            throw SystemManagerError.notAuthenticated
-        }
-        
-        // Validate token and refresh if needed
-        do {
-            let _ = try await xeroOAuthManager.getValidAccessToken()
-            print("Debug: SystemManager - Xero token validated successfully")
-        } catch {
-            print("Debug: SystemManager - ERROR: Xero token validation failed: \(error)")
-            throw SystemManagerError.tokenValidationFailed
-        }
-        
-        isConnected = true
-    }
+
     
     private func connectToQuickBooks() async throws {
         guard quickBooksOAuthManager.isAuthenticated else {
@@ -319,35 +300,7 @@ class SystemManager: ObservableObject {
                 isConnected = false
                 print("Debug: SystemManager - NetSuite status: \(connectionStatus), isConnected: \(isConnected)")
             }
-        case .xero:
-            let isAuth = xeroOAuthManager.isAuthenticated
-            if isAuth && isConnected {
-                // If we're already connected, show connected status immediately
-                connectionStatus = "Connected to Xero"
-                print("Debug: SystemManager - Xero status: \(connectionStatus), isConnected: \(isConnected)")
-            } else if isAuth {
-                // If authenticated but not yet connected, validate token
-                Task {
-                    do {
-                        let _ = try await xeroOAuthManager.getValidAccessToken()
-                        await MainActor.run {
-                            connectionStatus = "Connected to Xero"
-                            isConnected = true
-                            print("Debug: SystemManager - Xero status updated to: \(connectionStatus)")
-                        }
-                    } catch {
-                        await MainActor.run {
-                            connectionStatus = "Xero Token Expired"
-                            isConnected = false
-                            print("Debug: SystemManager - Xero token expired: \(error)")
-                        }
-                    }
-                }
-            } else {
-                connectionStatus = "Xero Not Authenticated"
-                isConnected = false
-                print("Debug: SystemManager - Xero status: \(connectionStatus), isConnected: \(isConnected)")
-            }
+
         case .quickbooks:
             let isAuth = quickBooksOAuthManager.isAuthenticated
             if isAuth && isConnected {
@@ -422,8 +375,7 @@ class SystemManager: ObservableObject {
         switch system {
         case .netsuite:
             return oAuthManager.isAuthenticated
-        case .xero:
-            return xeroOAuthManager.isAuthenticated
+
         case .quickbooks:
             return quickBooksOAuthManager.isAuthenticated
         case .salesforce:
@@ -442,8 +394,7 @@ class SystemManager: ObservableObject {
             return .noSystem
         case .netsuite:
             return await checkNetSuiteTokenHealth()
-        case .xero:
-            return await checkXeroTokenHealth()
+
         case .quickbooks:
             return await checkQuickBooksTokenHealth()
         case .salesforce:
@@ -464,18 +415,7 @@ class SystemManager: ObservableObject {
         }
     }
     
-    private func checkXeroTokenHealth() async -> TokenHealthStatus {
-        guard xeroOAuthManager.isAuthenticated else {
-            return .notAuthenticated
-        }
-        
-        do {
-            let _ = try await xeroOAuthManager.getValidAccessToken()
-            return .healthy
-        } catch {
-            return .expired
-        }
-    }
+
     
     private func checkQuickBooksTokenHealth() async -> TokenHealthStatus {
         guard quickBooksOAuthManager.isAuthenticated else {
@@ -511,8 +451,7 @@ class SystemManager: ObservableObject {
             throw SystemManagerError.noSystemConnected
         case .netsuite:
             let _ = try await oAuthManager.getValidAccessToken()
-        case .xero:
-            let _ = try await xeroOAuthManager.getValidAccessToken()
+
         case .quickbooks:
             let _ = try await quickBooksOAuthManager.getValidAccessToken()
         case .salesforce:
@@ -527,8 +466,7 @@ class SystemManager: ObservableObject {
         switch currentSystem {
         case .netsuite:
             return oAuthManager
-        case .xero:
-            return xeroOAuthManager
+
         case .quickbooks:
             return quickBooksOAuthManager
         case .salesforce:
@@ -542,8 +480,7 @@ class SystemManager: ObservableObject {
         switch currentSystem {
         case .netsuite:
             return try await oAuthManager.getValidAccessToken()
-        case .xero:
-            return try await xeroOAuthManager.getValidAccessToken()
+
         case .quickbooks:
             return try await quickBooksOAuthManager.getValidAccessToken()
         case .salesforce:

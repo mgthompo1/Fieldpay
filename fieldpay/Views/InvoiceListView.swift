@@ -14,16 +14,38 @@ struct CurrencyFormatter {
     }()
     
     func format(_ amount: Decimal) -> String {
-        return formatter.string(from: NSDecimalNumber(decimal: amount)) ?? "$0.00"
+        // Check for NaN or invalid values
+        if amount.isNaN || amount.isInfinite {
+            return "$0.00"
+        }
+        
+        let nsDecimal = NSDecimalNumber(decimal: amount)
+        if nsDecimal == NSDecimalNumber.notANumber {
+            return "$0.00"
+        }
+        
+        return formatter.string(from: nsDecimal) ?? "$0.00"
+    }
+    
+    func format(_ amount: Double) -> String {
+        // Check for NaN or invalid values
+        if amount.isNaN || amount.isInfinite {
+            return "$0.00"
+        }
+        
+        return formatter.string(from: NSNumber(value: amount)) ?? "$0.00"
     }
 }
 
 struct InvoiceListView: View {
     @ObservedObject var viewModel: InvoiceViewModel
+    @ObservedObject var customerViewModel: CustomerViewModel
     @State private var searchText = ""
     @State private var selectedStatus: Invoice.InvoiceStatus?
     @State private var showingAddInvoice = false
     @State private var debouncedSearchText = ""
+    @State private var showingCustomerSearch = false
+    @State private var selectedCustomerForSearch: Customer?
     
     var body: some View {
         NavigationView {
@@ -53,7 +75,10 @@ struct InvoiceListView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                         Button("Try Again") {
-                            viewModel.loadInvoices()
+                            viewModel.resetPagination()
+                            Task {
+                                await viewModel.loadNextPage()
+                            }
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
@@ -61,12 +86,98 @@ struct InvoiceListView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(.systemBackground))
                 } else {
-                    List {
-                        ForEach(filteredInvoices) { invoice in
-                            NavigationLink(destination: InvoiceDetailView(invoice: invoice, viewModel: viewModel)) {
-                                InvoiceRowView(invoice: invoice)
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            // Show active filters
+                            if selectedStatus != nil || selectedCustomerForSearch != nil {
+                                HStack {
+                                    if let status = selectedStatus {
+                                        HStack {
+                                            Text(status.displayName)
+                                                .font(.caption)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.blue.opacity(0.2))
+                                                .foregroundColor(.blue)
+                                                .cornerRadius(8)
+                                            
+                                            Button(action: {
+                                                selectedStatus = nil
+                                            }) {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .foregroundColor(.blue)
+                                            }
+                                        }
+                                    }
+                                    
+                                    if let customer = selectedCustomerForSearch {
+                                        HStack {
+                                            Text("Customer: \(customer.name)")
+                                                .font(.caption)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.green.opacity(0.2))
+                                                .foregroundColor(.green)
+                                                .cornerRadius(8)
+                                            
+                                            Button(action: {
+                                                selectedCustomerForSearch = nil
+                                            }) {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .foregroundColor(.green)
+                                            }
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Button("Clear All") {
+                                        selectedStatus = nil
+                                        selectedCustomerForSearch = nil
+                                    }
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal)
+                            }
+                            
+                            ForEach(filteredInvoices) { invoice in
+                                NavigationLink(destination: InvoiceDetailView(invoice: invoice, viewModel: viewModel, customerViewModel: customerViewModel)) {
+                                    InvoiceRowView(invoice: invoice)
+                                        .padding(.horizontal)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                            
+                            // Load more indicator
+                            if viewModel.hasMore && !viewModel.isLoading {
+                                Button(action: {
+                                    Task {
+                                        await viewModel.loadNextPage()
+                                    }
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.down.circle")
+                                        Text("Load More")
+                                    }
+                                    .foregroundColor(.blue)
+                                    .padding()
+                                }
+                            }
+                            
+                            // Loading indicator for pagination
+                            if viewModel.isLoading && !filteredInvoices.isEmpty {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Loading more invoices...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding()
                             }
                         }
+                        .padding(.vertical)
                     }
                     .searchable(text: $searchText, prompt: "Search invoices")
                     .accessibilityLabel("Search invoices by number or customer name")
@@ -79,6 +190,14 @@ struct InvoiceListView: View {
                                     debouncedSearchText = newValue
                                     viewModel.searchInvoices(query: newValue)
                                 }
+                            }
+                        }
+                    }
+                    .onAppear {
+                        // Load next page when reaching the end
+                        if filteredInvoices.isEmpty && !viewModel.isLoading {
+                            Task {
+                                await viewModel.loadNextPage()
                             }
                         }
                     }
@@ -107,10 +226,20 @@ struct InvoiceListView: View {
                                     .foregroundColor(.secondary)
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if filteredInvoices.isEmpty && selectedCustomerForSearch != nil {
+                            VStack(spacing: 12) {
+                                Image(systemName: "person.crop.circle")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.secondary)
+                                Text("No invoices for \(selectedCustomerForSearch?.name ?? "this customer")")
+                                    .font(.headline)
+                                Text("Try selecting a different customer")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
-                    // Performance optimization for large lists
-                    .environment(\.defaultMinListRowHeight, 80)
                 }
             }
             .navigationTitle("Invoices")
@@ -124,7 +253,12 @@ struct InvoiceListView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { viewModel.loadInvoices() }) {
+                    Button(action: { 
+                        viewModel.resetPagination()
+                        Task {
+                            await viewModel.loadNextPage()
+                        }
+                    }) {
                         Image(systemName: "arrow.clockwise")
                     }
                     .accessibilityLabel("Refresh invoices")
@@ -134,20 +268,35 @@ struct InvoiceListView: View {
                     Menu {
                         Button("All Invoices") {
                             selectedStatus = nil
+                            selectedCustomerForSearch = nil
                         }
                         ForEach(Invoice.InvoiceStatus.allCases, id: \.self) { status in
                             Button(status.displayName) {
                                 selectedStatus = status
                             }
                         }
+                        Divider()
+                        Button("Search by Customer") {
+                            showingCustomerSearch = true
+                        }
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                     }
-                    .accessibilityLabel("Filter invoices by status")
+                    .accessibilityLabel("Filter invoices by status or search by customer")
                 }
             }
             .sheet(isPresented: $showingAddInvoice) {
-                AddInvoiceView(viewModel: viewModel)
+                NewInvoiceView()
+            }
+            .sheet(isPresented: $showingCustomerSearch) {
+                CustomerSearchView(
+                    customerViewModel: customerViewModel,
+                    onCustomerSelected: { customer in
+                        selectedCustomerForSearch = customer
+                        viewModel.filterInvoicesByCustomer(customer.id)
+                        showingCustomerSearch = false
+                    }
+                )
             }
         }
     }
@@ -159,6 +308,10 @@ struct InvoiceListView: View {
             invoices = invoices.filter { $0.status == selectedStatus }
         }
         
+        if let selectedCustomer = selectedCustomerForSearch {
+            invoices = invoices.filter { $0.customerId == selectedCustomer.id }
+        }
+        
         if !debouncedSearchText.isEmpty {
             invoices = invoices.filter { invoice in
                 invoice.invoiceNumber.localizedCaseInsensitiveContains(debouncedSearchText) ||
@@ -168,6 +321,100 @@ struct InvoiceListView: View {
         
         // Always sort by createdDate in descending order (newest first)
         return invoices.sorted { $0.createdDate > $1.createdDate }
+    }
+}
+
+struct CustomerSearchView: View {
+    @ObservedObject var customerViewModel: CustomerViewModel
+    let onCustomerSelected: (Customer) -> Void
+    @State private var searchText = ""
+    @State private var customers: [Customer] = []
+    @State private var isLoading = false
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                if isLoading {
+                    ProgressView("Loading customers...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(filteredCustomers) { customer in
+                        Button(action: {
+                            onCustomerSelected(customer)
+                        }) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(customer.name)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                if let companyName = customer.companyName {
+                                    Text(companyName)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                if let email = customer.email {
+                                    Text(email)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .searchable(text: $searchText, prompt: "Search customers")
+                    .onChange(of: searchText) { _, newValue in
+                        // Debounce search
+                        Task {
+                            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                            if searchText == newValue {
+                                await loadCustomers(searchQuery: newValue)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Select Customer")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        // Dismiss the sheet
+                    }
+                }
+            }
+            .onAppear {
+                Task {
+                    await loadCustomers()
+                }
+            }
+        }
+    }
+    
+    private var filteredCustomers: [Customer] {
+        if searchText.isEmpty {
+            return customers
+        } else {
+            return customers.filter { customer in
+                customer.name.localizedCaseInsensitiveContains(searchText) ||
+                customer.companyName?.localizedCaseInsensitiveContains(searchText) == true ||
+                customer.email?.localizedCaseInsensitiveContains(searchText) == true
+            }
+        }
+    }
+    
+    private func loadCustomers(searchQuery: String = "") async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            let loadedCustomers = try await customerViewModel.searchCustomers(query: searchQuery)
+            await MainActor.run {
+                self.customers = loadedCustomers
+            }
+        } catch {
+            print("Failed to load customers: \(error)")
+        }
     }
 }
 
@@ -250,7 +497,9 @@ struct StatusBadge: View {
 struct InvoiceDetailView: View {
     let invoice: Invoice
     @ObservedObject var viewModel: InvoiceViewModel
+    @ObservedObject var customerViewModel: CustomerViewModel
     @State private var showingEditInvoice = false
+    @State private var showingPaymentSheet = false
     
     var body: some View {
         ScrollView {
@@ -364,7 +613,7 @@ struct InvoiceDetailView: View {
                                 color: .green,
                                 gradient: LinearGradient(colors: [.green, .mint], startPoint: .leading, endPoint: .trailing)
                             ) {
-                                // Navigate to payment processing
+                                showingPaymentSheet = true
                             }
                         }
                         
@@ -416,6 +665,217 @@ struct InvoiceDetailView: View {
         }
         .sheet(isPresented: $showingEditInvoice) {
             EditInvoiceView(invoice: invoice, viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingPaymentSheet) {
+            InvoicePaymentView(invoice: invoice, customerViewModel: customerViewModel, onPaymentSuccess: {
+                // Refresh the invoice data after successful payment
+                Task {
+                    await viewModel.loadInvoiceDetail(id: invoice.id)
+                }
+            })
+        }
+    }
+}
+
+struct InvoicePaymentView: View {
+    let invoice: Invoice
+    let onPaymentSuccess: (() -> Void)?
+    let customerViewModel: CustomerViewModel
+    
+    @StateObject private var paymentViewModel = PaymentViewModel()
+    @Environment(\.dismiss) private var dismiss
+    
+    init(invoice: Invoice, customerViewModel: CustomerViewModel, onPaymentSuccess: (() -> Void)? = nil) {
+        self.invoice = invoice
+        self.customerViewModel = customerViewModel
+        self.onPaymentSuccess = onPaymentSuccess
+    }
+    
+    @State private var selectedPaymentMethod: Payment.PaymentMethod = .tapToPay
+    @State private var amount: String = ""
+    @State private var description: String = ""
+    @State private var showingAmountInput = false
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header Section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Process Payment")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        
+                        Text("Invoice #\(invoice.invoiceNumber)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    
+                    // Invoice Summary Card
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Invoice Amount")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                
+                                Text("Customer: \(invoice.customerName)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(CurrencyFormatter.shared.format((invoice.amount as NSDecimalNumber).decimalValue))
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.primary)
+                                
+                                Text("Balance: \(CurrencyFormatter.shared.format((invoice.balance as NSDecimalNumber).decimalValue))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        // Payment Method Selection
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Payment Method")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
+                                ForEach(Payment.PaymentMethod.quickPaymentMethods, id: \.self) { method in
+                                    ModernPaymentMethodButton(
+                                        method: method,
+                                        isSelected: selectedPaymentMethod == method
+                                    ) {
+                                        selectedPaymentMethod = method
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Amount Input
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Payment Amount")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            
+                            HStack {
+                                Text("$")
+                                    .font(.title2)
+                                    .foregroundColor(.secondary)
+                                
+                                TextField("0.00", text: $amount)
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                    .keyboardType(.decimalPad)
+                                    .onAppear {
+                                        // Pre-fill with invoice balance
+                                        amount = String(format: "%.2f", (invoice.balance as NSDecimalNumber).doubleValue)
+                                    }
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                        }
+                        
+                        // Description Input
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Description (Optional)")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            
+                            TextField("Payment for invoice #\(invoice.invoiceNumber)", text: $description)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .onAppear {
+                                    description = "Payment for invoice #\(invoice.invoiceNumber)"
+                                }
+                        }
+                        
+                        // Process Payment Button
+                        Button(action: {
+                            guard let amountValue = Decimal(string: amount), amountValue > 0 else { return }
+                            
+                            Task {
+                                await paymentViewModel.processPayment(
+                                    amount: amountValue,
+                                    paymentMethod: selectedPaymentMethod,
+                                    customerId: invoice.customerId,
+                                    invoiceId: invoice.id,
+                                    description: description.isEmpty ? "Payment for invoice #\(invoice.invoiceNumber)" : description
+                                )
+                                
+                                // Close the sheet after successful payment
+                                if paymentViewModel.errorMessage == nil {
+                                    // Call success callback if provided
+                                    onPaymentSuccess?()
+                                    dismiss()
+                                }
+                            }
+                        }) {
+                            HStack {
+                                if paymentViewModel.isProcessingPayment {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "creditcard.fill")
+                                        .font(.title3)
+                                }
+                                
+                                Text(paymentViewModel.isProcessingPayment ? "Processing..." : "Process Payment")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(20)
+                            .background(
+                                LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing)
+                            )
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                        }
+                        .disabled(amount.isEmpty || paymentViewModel.isProcessingPayment)
+                        .opacity(amount.isEmpty ? 0.6 : 1.0)
+                        
+                        // Error Message
+                        if let errorMessage = paymentViewModel.errorMessage {
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding()
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding(24)
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+                    .padding(.horizontal, 20)
+                }
+                .padding(.vertical, 20)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                // Connect PaymentViewModel to CustomerViewModel for local payment storage
+                paymentViewModel.setCustomerViewModel(customerViewModel)
+            }
         }
     }
 }

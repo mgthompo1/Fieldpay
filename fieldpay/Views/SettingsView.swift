@@ -1,22 +1,52 @@
 import SwiftUI
+import PhotosUI
 
 struct SettingsView: View {
     @EnvironmentObject var settingsViewModel: SettingsViewModel
     @State private var showingStripeSettings = false
     @State private var showingNetSuiteSettings = false
     @State private var showingWindcaveSettings = false
-    @State private var showingXeroSettings = false
+
     @State private var showingQuickBooksSettings = false
     @State private var showingSalesforceSettings = false
     @State private var showingSystemSelection = false
     @State private var showingNetSuiteDebug = false
+    @State private var showingPaymentConfiguration = false
+    @State private var showingCompanyBranding = false
     
     var body: some View {
         NavigationView {
             List {
-                Section("Payment Configuration") {
+                Section("Configuration") {
                     Button(action: {
-                        showingStripeSettings = true
+                        showingCompanyBranding = true
+                    }) {
+                        HStack {
+                            Image(systemName: "building.2.crop.circle")
+                                .foregroundColor(.orange)
+                                .frame(width: 30)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Company Branding")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                Text("Configure company logo and name for customer payments")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Button(action: {
+                        showingPaymentConfiguration = true
                     }) {
                         HStack {
                             Image(systemName: "creditcard.fill")
@@ -24,11 +54,11 @@ struct SettingsView: View {
                                 .frame(width: 30)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Stripe Settings")
+                                Text("Payment Processing")
                                     .font(.headline)
                                     .foregroundColor(.primary)
                                 
-                                Text("Configure Stripe API keys")
+                                Text("Configure Stripe or Windcave payment processing")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -99,32 +129,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     
-                    Button(action: {
-                        showingXeroSettings = true
-                    }) {
-                        HStack {
-                            Image(systemName: "x.circle.fill")
-                                .foregroundColor(.blue)
-                                .frame(width: 30)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Xero Settings")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                
-                                Text("Configure OAuth integration")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
+
                     
                     Button(action: {
                         showingQuickBooksSettings = true
@@ -181,35 +186,6 @@ struct SettingsView: View {
                     .buttonStyle(PlainButtonStyle())
                 }
                 
-                Section("Tap to Pay Integration") {
-                    Button(action: {
-                        showingWindcaveSettings = true
-                    }) {
-                        HStack {
-                            Image(systemName: "wave.3.right")
-                                .foregroundColor(.purple)
-                                .frame(width: 30)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Windcave Settings")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                
-                                Text("Configure Tap to Pay on iPhone")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                
                 Section("Connection Status") {
                     HStack {
                         Image(systemName: settingsViewModel.isStripeConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
@@ -226,20 +202,6 @@ struct SettingsView: View {
                     }
                     
                     HStack {
-                        Image(systemName: settingsViewModel.isSystemConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .foregroundColor(settingsViewModel.isSystemConnected ? .green : .red)
-                        
-                        Text(settingsViewModel.selectedSystem.displayName)
-                            .font(.subheadline)
-                        
-                        Spacer()
-                        
-                        Text(settingsViewModel.systemConnectionStatus)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    HStack {
                         Image(systemName: settingsViewModel.isWindcaveConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
                             .foregroundColor(settingsViewModel.isWindcaveConnected ? .green : .red)
                         
@@ -249,6 +211,20 @@ struct SettingsView: View {
                         Spacer()
                         
                         Text(settingsViewModel.isWindcaveConnected ? "Connected" : "Not Connected")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Image(systemName: settingsViewModel.isSystemConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundColor(settingsViewModel.isSystemConnected ? .green : .red)
+                        
+                        Text(settingsViewModel.selectedSystem.displayName)
+                            .font(.subheadline)
+                        
+                        Spacer()
+                        
+                        Text(settingsViewModel.systemConnectionStatus)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -298,7 +274,7 @@ struct SettingsView: View {
                                     .font(.headline)
                                     .foregroundColor(.primary)
                                 
-                                Text("Check and fix authentication state")
+                                Text("Check current OAuth authentication status")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -317,11 +293,11 @@ struct SettingsView: View {
                                 .frame(width: 30)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("NetSuite API Debug")
+                                Text("NetSuite Debug")
                                     .font(.headline)
                                     .foregroundColor(.primary)
                                 
-                                Text("Test API calls and debug issues")
+                                Text("Debug NetSuite API calls and responses")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -356,31 +332,182 @@ struct SettingsView: View {
                 print("Debug: SettingsView appeared")
             }
             .navigationTitle("Settings")
-            .sheet(isPresented: $showingStripeSettings) {
-                StripeSettingsView(settingsViewModel: settingsViewModel)
-            }
-            .sheet(isPresented: $showingNetSuiteSettings) {
-                NetSuiteSettingsView(settingsViewModel: settingsViewModel)
-            }
-            .sheet(isPresented: $showingWindcaveSettings) {
-                WindcaveSettingsView(settingsViewModel: settingsViewModel)
-            }
-            .sheet(isPresented: $showingXeroSettings) {
-                XeroSettingsView(settingsViewModel: settingsViewModel)
-            }
-            .sheet(isPresented: $showingQuickBooksSettings) {
-                QuickBooksSettingsView(settingsViewModel: settingsViewModel)
-            }
-            .sheet(isPresented: $showingSalesforceSettings) {
-                SalesforceSettingsView(settingsViewModel: settingsViewModel)
-            }
-                    .sheet(isPresented: $showingSystemSelection) {
+            .navigationBarTitleDisplayMode(.large)
+        }
+        .sheet(isPresented: $showingCompanyBranding) {
+            CompanyBrandingView(settingsViewModel: settingsViewModel)
+        }
+        .sheet(isPresented: $showingPaymentConfiguration) {
+            PaymentConfigurationView()
+        }
+        .sheet(isPresented: $showingStripeSettings) {
+            StripeSettingsView(settingsViewModel: settingsViewModel)
+        }
+        .sheet(isPresented: $showingNetSuiteSettings) {
+            NetSuiteSettingsView(settingsViewModel: settingsViewModel)
+        }
+        .sheet(isPresented: $showingWindcaveSettings) {
+            WindcaveSettingsView(settingsViewModel: settingsViewModel)
+        }
+
+        .sheet(isPresented: $showingQuickBooksSettings) {
+            QuickBooksSettingsView(settingsViewModel: settingsViewModel)
+        }
+        .sheet(isPresented: $showingSalesforceSettings) {
+            SalesforceSettingsView(settingsViewModel: settingsViewModel)
+        }
+        .sheet(isPresented: $showingSystemSelection) {
             SystemSelectionView(settingsViewModel: settingsViewModel)
         }
         .sheet(isPresented: $showingNetSuiteDebug) {
             NetSuiteDebugView()
         }
+    }
+}
+
+// MARK: - Payment Configuration View
+struct PaymentConfigurationView: View {
+    @EnvironmentObject var settingsViewModel: SettingsViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedPaymentSystem: SettingsViewModel.PaymentSystem = .none
+    @State private var showingStripeSettings = false
+    @State private var showingWindcaveSettings = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                Section("Select Payment System") {
+                    ForEach(SettingsViewModel.PaymentSystem.allCases, id: \.self) { system in
+                        Button(action: {
+                            selectedPaymentSystem = system
+                            savePaymentSystemSelection()
+                        }) {
+                            HStack {
+                                Image(systemName: system.icon)
+                                    .foregroundColor(system.color)
+                                    .frame(width: 30)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(system.displayName)
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Text(system.description)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                if selectedPaymentSystem == system {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                }
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                
+                if selectedPaymentSystem == .stripe {
+                    Section("Stripe Configuration") {
+                        Button(action: {
+                            showingStripeSettings = true
+                        }) {
+                            HStack {
+                                Image(systemName: "gear")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 30)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Configure Stripe")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Text("Set up API keys and account settings")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                
+                if selectedPaymentSystem == .windcave {
+                    Section("Windcave Configuration") {
+                        Button(action: {
+                            showingWindcaveSettings = true
+                        }) {
+                            HStack {
+                                Image(systemName: "gear")
+                                    .foregroundColor(.purple)
+                                    .frame(width: 30)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Configure Windcave")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Text("Set up QR Code payments via Windcave")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+            .navigationTitle("Payment Configuration")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
         }
+        .onAppear {
+            loadCurrentPaymentSystem()
+        }
+        .sheet(isPresented: $showingStripeSettings) {
+            StripeSettingsView(settingsViewModel: settingsViewModel)
+        }
+        .sheet(isPresented: $showingWindcaveSettings) {
+            WindcaveSettingsView(settingsViewModel: settingsViewModel)
+        }
+    }
+    
+    private func loadCurrentPaymentSystem() {
+        // Load the currently selected payment system from UserDefaults
+        if let savedSystem = UserDefaults.standard.string(forKey: "selected_payment_system"),
+           let system = SettingsViewModel.PaymentSystem(rawValue: savedSystem) {
+            selectedPaymentSystem = system
+        } else {
+            // Default to none if nothing is saved
+            selectedPaymentSystem = .none
+        }
+    }
+    
+    private func savePaymentSystemSelection() {
+        UserDefaults.standard.set(selectedPaymentSystem.rawValue, forKey: "selected_payment_system")
+        
+        // Update the settings view model
+        settingsViewModel.savePaymentSystemSelection(selectedPaymentSystem)
     }
 }
 
@@ -481,10 +608,18 @@ struct NetSuiteSettingsView: View {
                 
                 Section("OAuth Flow") {
                     if settingsViewModel.isNetSuiteConnected {
-                        Button("Disconnect NetSuite") {
-                            settingsViewModel.disconnectNetSuite()
+                        VStack(spacing: 10) {
+                            Button("Disconnect NetSuite") {
+                                settingsViewModel.disconnectNetSuite()
+                            }
+                            .foregroundColor(.red)
+                            
+                            Button("Reconnect NetSuite") {
+                                print("Debug: Reconnect button tapped")
+                                settingsViewModel.reconnectNetSuite()
+                            }
+                            .foregroundColor(.blue)
                         }
-                        .foregroundColor(.red)
                     } else {
                         Button("Connect to NetSuite") {
                             print("Debug: Connect button tapped")
@@ -661,6 +796,130 @@ struct WindcaveSettingsView: View {
                         dismiss()
                     }
                     .disabled(settingsViewModel.windcaveUsername.isEmpty || settingsViewModel.windcaveApiKey.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Company Branding View
+struct CompanyBrandingView: View {
+    @ObservedObject var settingsViewModel: SettingsViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var companyLogoImage: UIImage?
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Company Information") {
+                    TextField("Company Name", text: $settingsViewModel.companyName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                
+                Section("Company Logo") {
+                    VStack(spacing: 16) {
+                        // Logo Preview
+                        if let logoImage = companyLogoImage {
+                            Image(uiImage: logoImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxHeight: 120)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                        } else if let logoData = settingsViewModel.companyLogoData,
+                                  let uiImage = UIImage(data: logoData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxHeight: 120)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                        } else {
+                            Rectangle()
+                                .fill(Color(.systemGray6))
+                                .frame(height: 120)
+                                .cornerRadius(12)
+                                .overlay(
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "photo")
+                                            .font(.largeTitle)
+                                            .foregroundColor(.secondary)
+                                        Text("No Logo Selected")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                )
+                        }
+                        
+                        // Photo Picker Button
+                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                            HStack {
+                                Image(systemName: "photo.on.rectangle")
+                                Text("Select Logo from Photos")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                        
+                        // Remove Logo Button
+                        if settingsViewModel.companyLogoData != nil || companyLogoImage != nil {
+                            Button("Remove Logo") {
+                                companyLogoImage = nil
+                                settingsViewModel.clearCompanyLogo()
+                            }
+                            .foregroundColor(.red)
+                        }
+                    }
+                }
+                
+                Section("Logo Guidelines") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("For best results:")
+                            .font(.headline)
+                        
+                        Text("• Use a square or rectangular logo")
+                        Text("• Recommended size: 200x200px or larger")
+                        Text("• Use PNG or JPEG format")
+                        Text("• Logo will appear above QR codes during payment")
+                        Text("• Keep file size under 5MB")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+            }
+            .navigationTitle("Company Branding")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        if let logoImage = companyLogoImage {
+                            settingsViewModel.companyLogoData = logoImage.jpegData(compressionQuality: 0.8)
+                        }
+                        settingsViewModel.saveCompanyBranding()
+                        dismiss()
+                    }
+                }
+            }
+            .onChange(of: selectedPhoto) { newPhoto in
+                Task {
+                    if let newPhoto = newPhoto {
+                        if let data = try? await newPhoto.loadTransferable(type: Data.self),
+                           let uiImage = UIImage(data: data) {
+                            await MainActor.run {
+                                companyLogoImage = uiImage
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -31,6 +31,17 @@ struct fieldpayApp: App {
         } else {
             print("Debug: ❌ No URL types found in Info.plist")
         }
+        
+        // Initialize NetSuiteAPI with stored configuration if available
+        print("Debug: Initializing NetSuiteAPI with stored configuration...")
+        if let accountId = UserDefaults.standard.string(forKey: "netsuite_account_id"),
+           let accessToken = UserDefaults.standard.string(forKey: "netsuite_access_token") {
+            print("Debug: Found stored NetSuite configuration - Account ID: \(accountId)")
+            NetSuiteAPI.shared.configure(accountId: accountId, accessToken: accessToken)
+            print("Debug: NetSuiteAPI configured successfully")
+        } else {
+            print("Debug: No stored NetSuite configuration found")
+        }
     }
     
     var body: some Scene {

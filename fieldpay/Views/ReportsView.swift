@@ -253,6 +253,10 @@ struct ReportsView: View {
                     .fontWeight(.semibold)
                 }
             }
+            .onAppear {
+                // Connect PaymentViewModel to CustomerViewModel for local payment storage
+                paymentViewModel.setCustomerViewModel(customerViewModel)
+            }
         }
     }
     

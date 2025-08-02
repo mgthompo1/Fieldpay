@@ -13,8 +13,16 @@ class PaymentViewModel: ObservableObject {
     private let netSuiteAPI = NetSuiteAPI.shared
     private var cancellables = Set<AnyCancellable>()
     
+    // Reference to CustomerViewModel for storing local payments
+    private var customerViewModel: CustomerViewModel?
+    
     init() {
         loadPayments()
+    }
+    
+    /// Set the CustomerViewModel reference for storing local payments
+    func setCustomerViewModel(_ viewModel: CustomerViewModel) {
+        self.customerViewModel = viewModel
     }
     
     func loadPayments() {
@@ -25,8 +33,14 @@ class PaymentViewModel: ObservableObject {
             do {
                 // Check if NetSuite is configured and connected
                 if let accessToken = netSuiteAPI.accessToken, !accessToken.isEmpty {
-                    let fetchedPayments = try await netSuiteAPI.fetchPayments()
-                    payments = fetchedPayments
+                    // Calculate date 6 months ago for general payment loading too
+                    let sixMonthsAgo = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
+                    
+                    // Fetch only recent payments (last 6 months) to avoid performance issues
+                    let fetchedPayments = try await netSuiteAPI.fetchRecentPayments(fromDate: sixMonthsAgo)
+                    payments = fetchedPayments.sorted { $0.createdDate > $1.createdDate }
+                    
+                    print("Debug: PaymentViewModel - Loaded \(payments.count) recent payments from last 6 months")
                 } else {
                     // NetSuite not connected, show error
                     errorMessage = "NetSuite not connected. Please complete OAuth authentication in Settings."
@@ -39,6 +53,40 @@ class PaymentViewModel: ObservableObject {
                 payments = []
                 isLoading = false
             }
+        }
+    }
+    
+    func loadPaymentsForCustomer(customerId: String) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Check if NetSuite is configured and connected
+            if let accessToken = netSuiteAPI.accessToken, !accessToken.isEmpty {
+                // Calculate date 6 months ago
+                let sixMonthsAgo = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
+                
+                // Fetch payments ONLY for the specific customer with date filtering
+                let fetchedPayments = try await netSuiteAPI.fetchCustomerPaymentsFiltered(
+                    customerId: customerId, 
+                    fromDate: sixMonthsAgo
+                )
+                
+                // Sort by most recent
+                payments = fetchedPayments.sorted { $0.createdDate > $1.createdDate }
+                
+                print("Debug: PaymentViewModel - Loaded \(payments.count) payments for customer \(customerId) from last 6 months")
+            } else {
+                // NetSuite not connected, show error
+                errorMessage = "NetSuite not connected. Please complete OAuth authentication in Settings."
+                payments = []
+            }
+            isLoading = false
+        } catch {
+            // If NetSuite fails, show error instead of mock data
+            errorMessage = "Failed to load payments for customer: \(error.localizedDescription)"
+            payments = []
+            isLoading = false
         }
     }
     
@@ -79,15 +127,46 @@ class PaymentViewModel: ObservableObject {
                 try await processManualPayment(payment)
             }
             
+            // Update payment status to succeeded after successful processing
+            let successfulPayment = Payment(
+                id: payment.id,
+                amount: payment.amount,
+                currency: payment.currency,
+                status: .succeeded,
+                paymentMethod: payment.paymentMethod,
+                customerId: payment.customerId,
+                invoiceId: payment.invoiceId,
+                description: payment.description,
+                stripePaymentIntentId: payment.stripePaymentIntentId,
+                netSuitePaymentId: payment.netSuitePaymentId,
+                createdDate: payment.createdDate,
+                processedDate: Date(),
+                failureReason: nil
+            )
+            
+            // Add to local payments array
+            payments.append(successfulPayment)
+            
             // Save to NetSuite if connected
             if let accessToken = netSuiteAPI.accessToken, !accessToken.isEmpty {
-                let createdPayment = try await netSuiteAPI.createPayment(payment)
-                payments.append(createdPayment)
+                print("Debug: PaymentViewModel - Creating customer payment in NetSuite")
+                do {
+                    let createdPayment = try await netSuiteAPI.createPayment(successfulPayment)
+                    // Update the payment with NetSuite ID
+                    if let index = payments.firstIndex(where: { $0.id == successfulPayment.id }) {
+                        payments[index] = createdPayment
+                    }
+                    print("Debug: PaymentViewModel - Successfully created customer payment in NetSuite with ID: \(createdPayment.netSuitePaymentId ?? "unknown")")
+                } catch {
+                    print("Debug: PaymentViewModel - Failed to save payment to NetSuite: \(error)")
+                    // Payment is already stored locally, just log the error
+                }
             } else {
-                // NetSuite not connected, show error
-                errorMessage = "NetSuite not connected. Payment cannot be saved. Please complete OAuth authentication in Settings."
-                return
+                print("Debug: PaymentViewModel - NetSuite not connected, payment stored locally only")
             }
+            
+            // Always store locally for customer view
+            await storePaymentLocally(successfulPayment)
             
             isProcessingPayment = false
             
@@ -175,29 +254,46 @@ class PaymentViewModel: ObservableObject {
             // Process manual card payment through payment gateway
             try await processManualCardPaymentGateway(payment)
             
-            // Save to NetSuite if connected, otherwise save locally
+            // Update payment status to succeeded after successful processing
+            let successfulPayment = Payment(
+                id: payment.id,
+                amount: payment.amount,
+                currency: payment.currency,
+                status: .succeeded,
+                paymentMethod: payment.paymentMethod,
+                customerId: payment.customerId,
+                invoiceId: payment.invoiceId,
+                description: payment.description,
+                stripePaymentIntentId: payment.stripePaymentIntentId,
+                netSuitePaymentId: payment.netSuitePaymentId,
+                createdDate: payment.createdDate,
+                processedDate: Date(),
+                failureReason: nil
+            )
+            
+            // Add to local payments array
+            payments.append(successfulPayment)
+            
+            // Save to NetSuite if connected
             if let accessToken = netSuiteAPI.accessToken, !accessToken.isEmpty {
-                let createdPayment = try await netSuiteAPI.createPayment(payment)
-                payments.append(createdPayment)
+                print("Debug: PaymentViewModel - Creating customer payment in NetSuite")
+                do {
+                    let createdPayment = try await netSuiteAPI.createPayment(successfulPayment)
+                    // Update the payment with NetSuite ID
+                    if let index = payments.firstIndex(where: { $0.id == successfulPayment.id }) {
+                        payments[index] = createdPayment
+                    }
+                    print("Debug: PaymentViewModel - Successfully created customer payment in NetSuite with ID: \(createdPayment.netSuitePaymentId ?? "unknown")")
+                } catch {
+                    print("Debug: PaymentViewModel - Failed to save payment to NetSuite: \(error)")
+                    // Payment is already stored locally, just log the error
+                }
             } else {
-                // Save locally for standalone mode
-                let localPayment = Payment(
-                    id: UUID().uuidString,
-                    amount: payment.amount,
-                    currency: payment.currency,
-                    status: payment.status,
-                    paymentMethod: payment.paymentMethod,
-                    customerId: payment.customerId,
-                    invoiceId: payment.invoiceId,
-                    description: payment.description,
-                    stripePaymentIntentId: payment.stripePaymentIntentId,
-                    netSuitePaymentId: payment.netSuitePaymentId,
-                    createdDate: Date(),
-                    processedDate: payment.processedDate,
-                    failureReason: payment.failureReason
-                )
-                payments.append(localPayment)
+                print("Debug: PaymentViewModel - NetSuite not connected, payment stored locally only")
             }
+            
+            // Always store locally for customer view
+            await storePaymentLocally(successfulPayment)
             
             isProcessingPayment = false
             
@@ -249,15 +345,29 @@ class PaymentViewModel: ObservableObject {
                 stripePaymentIntentId: paymentIntent.id
             )
             
+            // Add to local payments array
+            payments.append(payment)
+            
             // Save to NetSuite if connected
             if let accessToken = netSuiteAPI.accessToken, !accessToken.isEmpty {
-                let createdPayment = try await netSuiteAPI.createPayment(payment)
-                payments.append(createdPayment)
+                print("Debug: PaymentViewModel - Creating customer payment in NetSuite")
+                do {
+                    let createdPayment = try await netSuiteAPI.createPayment(payment)
+                    // Update the payment with NetSuite ID
+                    if let index = payments.firstIndex(where: { $0.id == payment.id }) {
+                        payments[index] = createdPayment
+                    }
+                    print("Debug: PaymentViewModel - Successfully created customer payment in NetSuite with ID: \(createdPayment.netSuitePaymentId ?? "unknown")")
+                } catch {
+                    print("Debug: PaymentViewModel - Failed to save payment to NetSuite: \(error)")
+                    // Payment is already stored locally, just log the error
+                }
             } else {
-                // NetSuite not connected, show error
-                errorMessage = "NetSuite not connected. Payment cannot be saved. Please complete OAuth authentication in Settings."
-                return
+                print("Debug: PaymentViewModel - NetSuite not connected, payment stored locally only")
             }
+            
+            // Always store locally for customer view
+            await storePaymentLocally(payment)
             
             isProcessingPayment = false
             
@@ -321,5 +431,28 @@ class PaymentViewModel: ObservableObject {
                 failureReason: "Refunded: \(refundAmount)"
             )
         }
+    }
+    
+    /// Store payment locally in CustomerViewModel
+    private func storePaymentLocally(_ payment: Payment) async {
+        guard let customerId = payment.customerId else {
+            print("Debug: PaymentViewModel - Cannot store payment locally: no customer ID")
+            return
+        }
+        
+        // Convert Payment to CustomerPayment for local storage
+        let customerPayment = CustomerPayment(
+            id: payment.id,
+            paymentNumber: "LOCAL-\(payment.id.prefix(8))",
+            date: payment.processedDate ?? payment.createdDate,
+            amount: payment.amount,
+            status: payment.status.rawValue,
+            memo: payment.description,
+            paymentMethod: payment.paymentMethod.rawValue
+        )
+        
+        // Store in CustomerViewModel
+        customerViewModel?.storeLocalPayment(customerPayment, for: customerId)
+        print("Debug: PaymentViewModel - Stored payment locally for customer \(customerId)")
     }
 } 

@@ -1,28 +1,51 @@
 import Foundation
 
-// MARK: - Enhanced NetSuite Invoice Record Models
+// MARK: - Invoice Status Enum
+enum InvoiceStatus: String, Codable {
+    case pendingApproval = "Pending Approval"
+    case pendingFulfillment = "Pending Fulfillment"
+    case pendingBilling = "Pending Billing"
+    case pendingBillingPartFulfilled = "Pending Billing Part Fulfilled"
+    case billingApproved = "Billing Approved"
+    case closed = "Closed"
+    case paidInFull = "Paid In Full"
+    case partiallyPaid = "Partially Paid"
+    case pendingReceipt = "Pending Receipt"
+    case unknown = "Unknown"
+    
+    init(rawValue: String) {
+        switch rawValue {
+        case "Pending Approval": self = .pendingApproval
+        case "Pending Fulfillment": self = .pendingFulfillment
+        case "Pending Billing": self = .pendingBilling
+        case "Pending Billing Part Fulfilled": self = .pendingBillingPartFulfilled
+        case "Billing Approved": self = .billingApproved
+        case "Closed": self = .closed
+        case "Paid In Full": self = .paidInFull
+        case "Partially Paid": self = .partiallyPaid
+        case "Pending Receipt": self = .pendingReceipt
+        default: self = .unknown
+        }
+    }
+}
 
-/// Complete NetSuite Invoice record with all fields and line items
+// MARK: - NetSuite Invoice Record
 struct NetSuiteInvoiceRecord: Codable {
     let id: String
     let tranId: String?
     let entity: EntityReference?
     let tranDate: String?
     let dueDate: String?
-    let status: String?
+    let status: InvoiceStatus?
     let total: Double?
-    let currency: CurrencyReference?
+    let currency: Reference?
     let createdDate: String?
     let lastModifiedDate: String?
     let memo: String?
     let balance: Double?
-    let location: LocationReference?
-    let customFieldList: [CustomField]?
-    
-    // Line items
-    let item: LineItemList?
-    
-    // Additional fields
+    let location: Reference?
+    let customFieldList: [String: String]?
+    let item: ItemList?
     let amountRemaining: Double?
     let amountPaid: Double?
     let billAddress: String?
@@ -32,7 +55,7 @@ struct NetSuiteInvoiceRecord: Codable {
     let subsidiary: Reference?
     let terms: Reference?
     let postingPeriod: Reference?
-    let source: Reference?
+    let source: String?
     let originator: String?
     let toBeEmailed: Bool?
     let toBeFaxed: Bool?
@@ -46,21 +69,113 @@ struct NetSuiteInvoiceRecord: Codable {
     let totalCostEstimate: Double?
     let subtotal: Double?
     
+    // Custom decoding to handle status field that can be either string or object
     enum CodingKeys: String, CodingKey {
-        case id, tranId, entity, tranDate, dueDate, status, total, currency
-        case createdDate, lastModifiedDate, memo, balance, location, customFieldList
-        case item, amountRemaining, amountPaid, billAddress, shipAddress, email
-        case customForm, subsidiary, terms, postingPeriod, source, originator
-        case toBeEmailed, toBeFaxed, toBePrinted, shipDate, shipIsResidential
-        case shipOverride, estGrossProfit, estGrossProfitPercent, exchangeRate
-        case totalCostEstimate, subtotal
+        case id, tranId, entity, tranDate, dueDate, status, total, currency, createdDate, lastModifiedDate, memo, balance, location, customFieldList, item, amountRemaining, amountPaid, billAddress, shipAddress, email, customForm, subsidiary, terms, postingPeriod, source, originator, toBeEmailed, toBeFaxed, toBePrinted, shipDate, shipIsResidential, shipOverride, estGrossProfit, estGrossProfitPercent, exchangeRate, totalCostEstimate, subtotal
     }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(String.self, forKey: .id)
+        tranId = try container.decodeIfPresent(String.self, forKey: .tranId)
+        entity = try container.decodeIfPresent(EntityReference.self, forKey: .entity)
+        tranDate = try container.decodeIfPresent(String.self, forKey: .tranDate)
+        dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
+        total = try container.decodeIfPresent(Double.self, forKey: .total)
+        currency = try container.decodeIfPresent(Reference.self, forKey: .currency)
+        createdDate = try container.decodeIfPresent(String.self, forKey: .createdDate)
+        lastModifiedDate = try container.decodeIfPresent(String.self, forKey: .lastModifiedDate)
+        memo = try container.decodeIfPresent(String.self, forKey: .memo)
+        balance = try container.decodeIfPresent(Double.self, forKey: .balance)
+        location = try container.decodeIfPresent(Reference.self, forKey: .location)
+        customFieldList = nil // Skip custom fields for now
+        item = try container.decodeIfPresent(ItemList.self, forKey: .item)
+        amountRemaining = try container.decodeIfPresent(Double.self, forKey: .amountRemaining)
+        amountPaid = try container.decodeIfPresent(Double.self, forKey: .amountPaid)
+        billAddress = try container.decodeIfPresent(String.self, forKey: .billAddress)
+        shipAddress = try container.decodeIfPresent(String.self, forKey: .shipAddress)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        customForm = try container.decodeIfPresent(Reference.self, forKey: .customForm)
+        subsidiary = try container.decodeIfPresent(Reference.self, forKey: .subsidiary)
+        terms = try container.decodeIfPresent(Reference.self, forKey: .terms)
+        postingPeriod = try container.decodeIfPresent(Reference.self, forKey: .postingPeriod)
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+        originator = try container.decodeIfPresent(String.self, forKey: .originator)
+        toBeEmailed = try container.decodeIfPresent(Bool.self, forKey: .toBeEmailed)
+        toBeFaxed = try container.decodeIfPresent(Bool.self, forKey: .toBeFaxed)
+        toBePrinted = try container.decodeIfPresent(Bool.self, forKey: .toBePrinted)
+        shipDate = try container.decodeIfPresent(String.self, forKey: .shipDate)
+        shipIsResidential = try container.decodeIfPresent(Bool.self, forKey: .shipIsResidential)
+        shipOverride = try container.decodeIfPresent(Bool.self, forKey: .shipOverride)
+        estGrossProfit = try container.decodeIfPresent(Double.self, forKey: .estGrossProfit)
+        estGrossProfitPercent = try container.decodeIfPresent(Double.self, forKey: .estGrossProfitPercent)
+        exchangeRate = try container.decodeIfPresent(Double.self, forKey: .exchangeRate)
+        totalCostEstimate = try container.decodeIfPresent(Double.self, forKey: .totalCostEstimate)
+        subtotal = try container.decodeIfPresent(Double.self, forKey: .subtotal)
+        
+        // Handle status field that can be either string or object
+        if let statusString = try? container.decode(String.self, forKey: .status) {
+            status = InvoiceStatus(rawValue: statusString)
+        } else if let statusObject = try? container.decode(StatusObject.self, forKey: .status) {
+            status = InvoiceStatus(rawValue: statusObject.id)
+        } else {
+            status = nil
+        }
+    }
+    
+    // Custom initializer for SuiteQL fallback
+    init(id: String, tranId: String?, entity: EntityReference?, tranDate: String?, dueDate: String?, status: String?, total: Double?, currency: Reference?, createdDate: String?, lastModifiedDate: String?, memo: String?, balance: Double?, location: Reference?, customFieldList: [String: String]?, item: ItemList?, amountRemaining: Double?, amountPaid: Double?, billAddress: String?, shipAddress: String?, email: String?, customForm: Reference?, subsidiary: Reference?, terms: Reference?, postingPeriod: Reference?, source: String?, originator: String?, toBeEmailed: Bool?, toBeFaxed: Bool?, toBePrinted: Bool?, shipDate: String?, shipIsResidential: Bool?, shipOverride: Bool?, estGrossProfit: Double?, estGrossProfitPercent: Double?, exchangeRate: Double?, totalCostEstimate: Double?, subtotal: Double?) {
+        self.id = id
+        self.tranId = tranId
+        self.entity = entity
+        self.tranDate = tranDate
+        self.dueDate = dueDate
+        self.status = status != nil ? InvoiceStatus(rawValue: status!) : nil
+        self.total = total
+        self.currency = currency
+        self.createdDate = createdDate
+        self.lastModifiedDate = lastModifiedDate
+        self.memo = memo
+        self.balance = balance
+        self.location = location
+        self.customFieldList = customFieldList
+        self.item = item
+        self.amountRemaining = amountRemaining
+        self.amountPaid = amountPaid
+        self.billAddress = billAddress
+        self.shipAddress = shipAddress
+        self.email = email
+        self.customForm = customForm
+        self.subsidiary = subsidiary
+        self.terms = terms
+        self.postingPeriod = postingPeriod
+        self.source = source
+        self.originator = originator
+        self.toBeEmailed = toBeEmailed
+        self.toBeFaxed = toBeFaxed
+        self.toBePrinted = toBePrinted
+        self.shipDate = shipDate
+        self.shipIsResidential = shipIsResidential
+        self.shipOverride = shipOverride
+        self.estGrossProfit = estGrossProfit
+        self.estGrossProfitPercent = estGrossProfitPercent
+        self.exchangeRate = exchangeRate
+        self.totalCostEstimate = totalCostEstimate
+        self.subtotal = subtotal
+    }
+}
+
+// Helper struct for status object
+struct StatusObject: Codable {
+    let id: String
+    let refName: String?
 }
 
 // MARK: - Line Item Models
 
 /// Container for line items
-struct LineItemList: Codable {
+struct ItemList: Codable {
     let item: [LineItem]?
 }
 
@@ -217,20 +332,25 @@ extension NetSuiteInvoiceRecord {
         } ?? []
         
         // Determine status
-        let statusString = status ?? "unknown"
-        let netSuiteStatus = NetSuiteInvoiceStatus(rawValue: statusString)
+        let statusString = status?.rawValue ?? "unknown"
+        let netSuiteStatus = InvoiceStatus(rawValue: statusString)
         let invoiceStatus: Invoice.InvoiceStatus
         
         switch netSuiteStatus {
-        case .paid:
+        case .paidInFull:
             invoiceStatus = .paid
-        case .overdue:
-            invoiceStatus = .overdue
-        case .cancelled:
-            invoiceStatus = .cancelled
-        case .pending, .draft, .approved, .closed, .unknown:
+        case .pendingApproval, .pendingFulfillment, .pendingBilling, .pendingBillingPartFulfilled, .billingApproved, .pendingReceipt:
             invoiceStatus = .pending
-        case .none:
+        case .closed:
+            invoiceStatus = .cancelled
+        case .partiallyPaid:
+            // Check if overdue based on due date
+            if let parsedDueDate = dueDate, parsedDueDate < Date() {
+                invoiceStatus = .overdue
+            } else {
+                invoiceStatus = .pending
+            }
+        case .unknown:
             invoiceStatus = .pending
         }
         
@@ -241,7 +361,7 @@ extension NetSuiteInvoiceRecord {
         
         // Enhanced customer information
         let customerId = entity?.id ?? ""
-        let customerName = entity?.refName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown Customer"
+        let customerName = entity?.refName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Customer \(id)"
         
         return Invoice(
             id: id,
@@ -278,7 +398,7 @@ extension NetSuiteInvoiceRecord {
     
     /// Get customer name safely
     var customerName: String {
-        return entity?.refName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown Customer"
+        return entity?.refName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Customer \(id)"
     }
     
     /// Get formatted total amount
@@ -293,7 +413,7 @@ extension NetSuiteInvoiceRecord {
     
     /// Check if invoice is paid
     var isPaid: Bool {
-        return (balance ?? 0) <= 0 || status?.lowercased() == "paid"
+        return (balance ?? 0) <= 0 || status?.rawValue.lowercased() == "paid"
     }
     
     /// Get days until due (negative if overdue)

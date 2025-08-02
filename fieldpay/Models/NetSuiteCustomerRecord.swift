@@ -82,10 +82,35 @@ extension NetSuiteCustomerRecord {
             country: primaryAddress?.country
         )
         
-        // Get customer name
-        let customerName = entityId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false 
-            ? entityId! 
-            : companyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown Customer"
+        // Enhanced customer name handling with better fallback logic
+        let trimmedEntityId = entityId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCompanyName = companyName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Extract customer name from company name if it contains parentheses with name
+        let customerName: String
+        if let companyName = trimmedCompanyName, !companyName.isEmpty {
+            // Check if company name contains a name in parentheses (e.g., "Default Customer (Wilman Arambillete, ...)")
+            if let nameStart = companyName.range(of: "("),
+               let nameEnd = companyName.range(of: ",", range: nameStart.upperBound..<companyName.endIndex) {
+                let extractedName = String(companyName[nameStart.upperBound..<nameEnd.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !extractedName.isEmpty {
+                    customerName = extractedName
+                } else {
+                    customerName = companyName
+                }
+            } else {
+                customerName = companyName
+            }
+        } else if let entityId = trimmedEntityId, !entityId.isEmpty {
+            // Only use entityId if it looks like a name (not a numeric ID)
+            if entityId.range(of: "^[0-9]+$", options: .regularExpression) == nil {
+                customerName = entityId
+            } else {
+                customerName = "Customer \(id)"
+            }
+        } else {
+            customerName = "Customer \(id)"
+        }
         
         return Customer(
             id: id,
@@ -104,9 +129,33 @@ extension NetSuiteCustomerRecord {
     // MARK: - Convenience Accessors
     
     var displayName: String {
-        return companyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? 
-               entityId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? 
-               "Unknown Customer"
+        let trimmedCompanyName = companyName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedEntityId = entityId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Extract customer name from company name if it contains parentheses with name
+        if let companyName = trimmedCompanyName, !companyName.isEmpty {
+            // Check if company name contains a name in parentheses (e.g., "Default Customer (Wilman Arambillete, ...)")
+            if let nameStart = companyName.range(of: "("),
+               let nameEnd = companyName.range(of: ",", range: nameStart.upperBound..<companyName.endIndex) {
+                let extractedName = String(companyName[nameStart.upperBound..<nameEnd.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !extractedName.isEmpty {
+                    return extractedName
+                } else {
+                    return companyName
+                }
+            } else {
+                return companyName
+            }
+        } else if let entityId = trimmedEntityId, !entityId.isEmpty {
+            // Only use entityId if it looks like a name (not a numeric ID)
+            if entityId.range(of: "^[0-9]+$", options: .regularExpression) == nil {
+                return entityId
+            } else {
+                return "Customer \(id)"
+            }
+        } else {
+            return "Customer \(id)"
+        }
     }
     
     var formattedBalance: String {

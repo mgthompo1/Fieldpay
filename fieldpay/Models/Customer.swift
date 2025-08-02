@@ -1,6 +1,6 @@
 import Foundation
 
-struct Customer: Identifiable, Codable {
+struct Customer: Identifiable, Codable, Equatable {
     let id: String
     let name: String
     let email: String?
@@ -12,7 +12,7 @@ struct Customer: Identifiable, Codable {
     let createdDate: Date
     let lastModifiedDate: Date
     
-    struct Address: Codable {
+    struct Address: Codable, Equatable {
         let street: String?
         let city: String?
         let state: String?

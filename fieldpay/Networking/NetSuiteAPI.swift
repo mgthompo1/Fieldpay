@@ -1,6 +1,20 @@
 import Foundation
 import Combine
 
+// MARK: - NetSuite API Constants
+
+enum NetSuiteAPIPath {
+    static let recordBase = "/services/rest/record/v1"
+    static let queryBase = "/services/rest/query/v1"
+    
+    static let invoice = "\(recordBase)/invoice"
+    static let customer = "\(recordBase)/customer"
+    static let customerPayment = "\(recordBase)/customerpayment"
+    static let transaction = "\(recordBase)/transaction"
+    static let salesOrder = "\(recordBase)/salesorder"
+    static let suiteQL = "\(queryBase)/suiteql"
+}
+
 // MARK: - NetSuite Resource Enum
 
 enum NetSuiteResource {
@@ -8,57 +22,71 @@ enum NetSuiteResource {
     case invoiceDetail(id: String)
     case customers(limit: Int, offset: Int)
     case customerDetail(id: String)
-    case customerPayments(customerId: String)
-    case customerInvoices(customerId: String)
+    case customerPayments(customerId: String, limit: Int, offset: Int)
+    case customerInvoices(customerId: String, limit: Int, offset: Int)
     case customerTransactions(customerId: String, limit: Int)
     case suiteQL(query: String)
 
-    var url: URL {
-        let base = NetSuiteAPI.baseURL
+    func url(with baseURL: String) -> URL {
         switch self {
         case .invoices(let limit, let offset, let status):
-            var components = URLComponents(string: base + "/services/rest/record/v1/invoice")!
+            // Use REST Record API for invoices - provides total, amountpaid, amountremaining, etc.
+            var components = URLComponents(string: baseURL + NetSuiteAPIPath.invoice)!
             var queryItems = [
                 URLQueryItem(name: "limit", value: String(limit)),
                 URLQueryItem(name: "offset", value: String(offset))
             ]
+            
+            // Add status filter if provided
             if let status = status {
                 queryItems.append(URLQueryItem(name: "q", value: "status==\"\(status)\""))
             }
+            
             components.queryItems = queryItems
             return components.url!
         case .invoiceDetail(let id):
-            return URL(string: base + "/services/rest/record/v1/invoice/\(id)")!
+            return URL(string: baseURL + NetSuiteAPIPath.invoice + "/\(id)")!
         case .customers(let limit, let offset):
-            var components = URLComponents(string: base + "/services/rest/record/v1/customer")!
+            var components = URLComponents(string: baseURL + NetSuiteAPIPath.customer)!
             components.queryItems = [
                 URLQueryItem(name: "limit", value: String(limit)),
                 URLQueryItem(name: "offset", value: String(offset))
             ]
             return components.url!
         case .customerDetail(let id):
-            return URL(string: base + "/services/rest/record/v1/customer/\(id)")!
-        case .customerPayments(let customerId):
-            var components = URLComponents(string: base + "/services/rest/record/v1/customerpayment")!
+            return URL(string: baseURL + NetSuiteAPIPath.customer + "/\(id)")!
+        case .customerPayments(let customerId, let limit, let offset):
+            var components = URLComponents(string: baseURL + NetSuiteAPIPath.customerPayment)!
             components.queryItems = [
-                URLQueryItem(name: "q", value: "entity==\"\(customerId)\"")
+                URLQueryItem(name: "q", value: "entity==\"\(customerId)\""),
+                URLQueryItem(name: "limit", value: String(limit)),
+                URLQueryItem(name: "offset", value: String(offset))
             ]
             return components.url!
-        case .customerInvoices(let customerId):
-            var components = URLComponents(string: base + "/services/rest/record/v1/invoice")!
+        case .customerInvoices(let customerId, let limit, let offset):
+            var components = URLComponents(string: baseURL + NetSuiteAPIPath.invoice)!
             components.queryItems = [
-                URLQueryItem(name: "q", value: "entity==\"\(customerId)\"")
+                URLQueryItem(name: "q", value: "entity==\"\(customerId)\""),
+                URLQueryItem(name: "limit", value: String(limit)),
+                URLQueryItem(name: "offset", value: String(offset))
             ]
             return components.url!
         case .customerTransactions(let customerId, let limit):
-            var components = URLComponents(string: base + "/services/rest/record/v1/transaction")!
+            var components = URLComponents(string: baseURL + NetSuiteAPIPath.transaction)!
             components.queryItems = [
                 URLQueryItem(name: "q", value: "entity==\"\(customerId)\""),
                 URLQueryItem(name: "limit", value: String(limit))
             ]
             return components.url!
         case .suiteQL(_):
-            return URL(string: base + "/services/rest/query/v1/suiteql")!
+            var components = URLComponents(string: baseURL + NetSuiteAPIPath.suiteQL)!
+            // Add pagination parameters if they exist in the query context
+            // For now, we'll add default pagination to prevent large result sets
+            components.queryItems = [
+                URLQueryItem(name: "limit", value: "50"),
+                URLQueryItem(name: "offset", value: "0")
+            ]
+            return components.url!
         }
     }
     
@@ -75,8 +103,6 @@ enum NetSuiteResource {
 // MARK: - NetSuiteAPI Generic Fetch
 
 class NetSuiteAPI: ObservableObject {
-    static let baseURL = "https://tstdrv1870144.suitetalk.api.netsuite.com"
-    
     static let shared = NetSuiteAPI()
     
     private(set) var accessToken: String?
@@ -697,7 +723,19 @@ class NetSuiteAPI: ObservableObject {
             let invoice: NetSuiteInvoiceRecord = try await fetch(resource, type: NetSuiteInvoiceRecord.self)
             
             print("Debug: NetSuiteAPI - Successfully parsed detailed invoice: \(invoice.tranId ?? "unknown")")
-            print("Debug: NetSuiteAPI - Line items: \(invoice.lineItemsSummary)")
+            print("Debug: NetSuiteAPI - Invoice details:")
+            print("  - ID: \(invoice.id)")
+            print("  - Transaction ID: \(invoice.tranId ?? "nil")")
+            print("  - Customer: \(invoice.customerName)")
+            print("  - Total: \(invoice.formattedTotal)")
+            print("  - Balance: \(invoice.formattedBalance)")
+            print("  - Status: \(invoice.status?.rawValue ?? "nil")")
+            print("  - Due Date: \(invoice.dueDate ?? "nil")")
+            print("  - Line items: \(invoice.lineItemsSummary)")
+            print("  - Is Paid: \(invoice.isPaid)")
+            if let daysUntilDue = invoice.daysUntilDue {
+                print("  - Days until due: \(daysUntilDue)")
+            }
             return invoice
         } catch {
             print("Debug: NetSuiteAPI - Failed to fetch invoice detail via REST API for ID \(id): \(error)")
@@ -717,33 +755,79 @@ class NetSuiteAPI: ObservableObject {
     private func fetchInvoiceDetailViaSuiteQL(id: String) async throws -> NetSuiteInvoiceRecord {
         print("Debug: NetSuiteAPI - Fetching invoice detail via SuiteQL for ID: \(id)")
         
-        let query = "SELECT id, tranid, entity, total, amountremaining, amountpaid, trandate, status, memo FROM invoice WHERE id = '\(id)' LIMIT 1"
-        let resource = NetSuiteResource.suiteQL(query: query)
-        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+        // First fetch the invoice basic data
+        let invoiceQuery = "SELECT id, tranid, entity, amount, trandate, status, memo, duedate, amountremaining, amountpaid FROM transaction WHERE id = '\(id)' AND type = 'Invoice'"
+        let invoiceResource = NetSuiteResource.suiteQL(query: invoiceQuery)
+        let invoiceResponse: SuiteQLResponse = try await fetch(invoiceResource, type: SuiteQLResponse.self)
         
-        guard let firstRow = response.items.first else {
+        guard let invoiceRow = invoiceResponse.items.first else {
             throw NetSuiteError.invalidResponse
         }
         
-        // Create a basic NetSuiteInvoiceRecord from SuiteQL data
+        // Fetch line items for the invoice
+        let lineItemQuery = """
+        SELECT 
+            il.tranid,
+            il.line,
+            il.item,
+            il.quantity,
+            il.rate,
+            il.amount,
+            il.memo,
+            i.itemid,
+            i.displayname
+        FROM transactionline il
+        LEFT JOIN item i ON il.item = i.id
+        WHERE il.transaction = '\(id)'
+        ORDER BY il.line
+        """
+        
+        let lineItemResource = NetSuiteResource.suiteQL(query: lineItemQuery)
+        let lineItemResponse: SuiteQLResponse = try await fetch(lineItemResource, type: SuiteQLResponse.self)
+        
+        // Convert line items
+        let lineItems = lineItemResponse.items.map { row -> LineItem in
+            let itemId = row.values["column2"] ?? ""
+            let itemName = row.values["column8"] ?? row.values["column7"] ?? "Unknown Item"
+            
+            return LineItem(
+                line: Int(row.values["column1"] ?? "0"),
+                description: row.values["column6"] ?? itemName,
+                item: Reference(id: itemId, refName: itemName, type: "item"),
+                quantity: Double(row.values["column3"] ?? "0"),
+                rate: Double(row.values["column4"] ?? "0"),
+                amount: Double(row.values["column5"] ?? "0"),
+                taxCode: nil,
+                grossAmt: nil,
+                netAmount: nil,
+                taxAmount: nil,
+                taxRate1: nil,
+                taxRate2: nil,
+                customFieldList: nil
+            )
+        }
+        
+        print("Debug: NetSuiteAPI - Fetched \(lineItems.count) line items via SuiteQL")
+        
+        // Create a NetSuiteInvoiceRecord from SuiteQL data with line items
         let invoiceRecord = NetSuiteInvoiceRecord(
-            id: firstRow.values["column0"] ?? id,
-            tranId: firstRow.values["column1"],
-            entity: EntityReference(id: firstRow.values["column2"] ?? "", refName: nil, type: nil),
-            tranDate: firstRow.values["column5"],
-            dueDate: nil,
-            status: firstRow.values["column7"],
-            total: Double(firstRow.values["column3"] ?? "0"),
+            id: invoiceRow.values["column0"] ?? id,
+            tranId: invoiceRow.values["column1"],
+            entity: EntityReference(id: invoiceRow.values["column2"] ?? "", refName: nil, type: nil),
+            tranDate: invoiceRow.values["column4"],
+            dueDate: invoiceRow.values["column7"],
+            status: invoiceRow.values["column5"],
+            total: Double(invoiceRow.values["column3"] ?? "0"),
             currency: nil,
             createdDate: nil,
             lastModifiedDate: nil,
-            memo: firstRow.values["column8"],
-            balance: Double(firstRow.values["column4"] ?? "0"),
+            memo: invoiceRow.values["column6"],
+            balance: Double(invoiceRow.values["column8"] ?? "0"),
             location: nil,
             customFieldList: nil,
-            item: nil,
-            amountRemaining: Double(firstRow.values["column4"] ?? "0"),
-            amountPaid: Double(firstRow.values["column6"] ?? "0"),
+            item: ItemList(item: lineItems),
+            amountRemaining: Double(invoiceRow.values["column8"] ?? "0"),
+            amountPaid: Double(invoiceRow.values["column9"] ?? "0"),
             billAddress: nil,
             shipAddress: nil,
             email: nil,
@@ -775,6 +859,8 @@ class NetSuiteAPI: ObservableObject {
         print("Debug: NetSuiteAPI - Fetching detailed invoices for \(invoiceIds.count) IDs with concurrent limit: \(concurrentLimit)")
         
         var detailedInvoices: [NetSuiteInvoiceRecord] = []
+        var successfulCount = 0
+        var failedCount = 0
         
         // Use TaskGroup with proper concurrency control
         await withTaskGroup(of: NetSuiteInvoiceRecord?.self) { group in
@@ -782,6 +868,8 @@ class NetSuiteAPI: ObservableObject {
             for batch in stride(from: 0, to: invoiceIds.count, by: concurrentLimit) {
                 let endIndex = min(batch + concurrentLimit, invoiceIds.count)
                 let batchIds = Array(invoiceIds[batch..<endIndex])
+                
+                print("Debug: NetSuiteAPI - Processing batch \(batch/concurrentLimit + 1): \(batchIds.count) invoices")
                 
                 // Add tasks for this batch
                 for invoiceId in batchIds {
@@ -800,12 +888,22 @@ class NetSuiteAPI: ObservableObject {
                 for await result in group {
                     if let invoice = result {
                         detailedInvoices.append(invoice)
+                        successfulCount += 1
+                    } else {
+                        failedCount += 1
                     }
                 }
+                
+                print("Debug: NetSuiteAPI - Batch \(batch/concurrentLimit + 1) completed: \(successfulCount) successful, \(failedCount) failed")
             }
         }
         
-        print("Debug: NetSuiteAPI - Successfully fetched \(detailedInvoices.count) detailed invoices")
+        print("Debug: NetSuiteAPI - Completed fetching detailed invoices:")
+        print("  - Total requested: \(invoiceIds.count)")
+        print("  - Successfully fetched: \(successfulCount)")
+        print("  - Failed: \(failedCount)")
+        print("  - Success rate: \(String(format: "%.1f%%", Double(successfulCount) / Double(invoiceIds.count) * 100))")
+        
         return detailedInvoices
     }
     
@@ -863,25 +961,159 @@ class NetSuiteAPI: ObservableObject {
         return netSuiteInvoice.toInvoice()
     }
     
-    // MARK: - Sales Orders
-    func fetchSalesOrders() async throws -> [SalesOrder] {
-        let endpoint = "/services/rest/record/v1/salesorder"
-        let url = URL(string: baseURL + endpoint)!
+    // MARK: - Items
+    
+    /// Fetches available items/products from NetSuite for invoice creation
+    func fetchItems(limit: Int = 100) async throws -> [NetSuiteItem] {
+        try await validateTokenBeforeRequest()
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let query = """
+        SELECT 
+            id,
+            itemid,
+            displayname,
+            baseprice,
+            description,
+            isinactive,
+            itemtype
+        FROM item 
+        WHERE isinactive = 'F' 
+        AND itemtype IN ('InvtPart', 'NonInvtPart', 'Service')
+        ORDER BY displayname
+        """
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let resource = NetSuiteResource.suiteQL(query: query)
+        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw NetSuiteError.requestFailed
+        let items = response.items.compactMap { row -> NetSuiteItem? in
+            guard let id = row.values["column0"],
+                  let itemId = row.values["column1"] else {
+                return nil
+            }
+            
+            return NetSuiteItem(
+                id: id,
+                itemId: itemId,
+                displayName: row.values["column2"] ?? itemId,
+                basePrice: Double(row.values["column3"] ?? "0") ?? 0.0,
+                description: row.values["column4"],
+                itemType: row.values["column6"] ?? "Service"
+            )
         }
         
-        let salesOrders = try JSONDecoder().decode([SalesOrder].self, from: data)
+        print("Debug: NetSuiteAPI - Fetched \(items.count) items")
+        return items
+    }
+    
+    // MARK: - Sales Orders
+    func fetchSalesOrders() async throws -> [SalesOrder] {
+        // Use SuiteQL for full control and compatibility
+        let suiteQL = """
+            SELECT id, tranid, entity, amount, status, trandate, memo, duedate
+            FROM transaction
+            WHERE type = 'SalesOrd'
+            ORDER BY trandate DESC
+        """
+        let resource = NetSuiteResource.suiteQL(query: suiteQL)
+        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+        
+        // Collect all unique customer IDs
+        let customerIds = Set(response.items.compactMap { $0.values["column2"] }).filter { !$0.isEmpty }
+        let customerNameMap = try await fetchCustomerNamesBatch(customerIds: Array(customerIds))
+        
+        // Map SuiteQL rows to SalesOrder
+        let salesOrders: [SalesOrder] = response.items.compactMap { row in
+            let id = row.values["column0"] ?? ""
+            let orderNumber = row.values["column1"] ?? "SO-\(id)"
+            let customerId = row.values["column2"] ?? ""
+            let amount = Decimal(string: row.values["column3"] ?? "0") ?? Decimal(0)
+            let statusRaw = row.values["column4"] ?? "pending_approval"
+            let orderDateStr = row.values["column5"]
+            let notes = row.values["column6"]
+            let dueDateStr = row.values["column7"]
+            let customerName = customerNameMap[customerId] ?? "Customer \(customerId)"
+            let orderDate = NetSuiteDateParser.parseDate(orderDateStr) ?? Date()
+            let dueDate = NetSuiteDateParser.parseDate(dueDateStr)
+            return SalesOrder(
+                id: id,
+                orderNumber: orderNumber,
+                customerId: customerId,
+                customerName: customerName,
+                amount: amount,
+                status: SalesOrder.SalesOrderStatus(rawValue: statusRaw) ?? .pendingApproval,
+                orderDate: orderDate,
+                expectedShipDate: dueDate,
+                netSuiteId: id,
+                items: [], // Items can be fetched separately if needed
+                notes: notes
+            )
+        }
         return salesOrders
+    }
+    
+    /// Fetch sales orders for a specific customer
+    func fetchCustomerSalesOrders(for customerId: String) async throws -> [SalesOrder] {
+        // Use SuiteQL to fetch sales orders for specific customer
+        let suiteQL = """
+            SELECT id, tranid, entity, amount, status, trandate, memo, duedate
+            FROM transaction
+            WHERE type = 'SalesOrd' AND entity = '\(customerId)'
+            ORDER BY trandate DESC
+        """
+        let resource = NetSuiteResource.suiteQL(query: suiteQL)
+        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+        
+        // Get customer name for this specific customer
+        let customerNameMap = try await fetchCustomerNamesBatch(customerIds: [customerId])
+        
+        // Map SuiteQL rows to SalesOrder
+        let salesOrders: [SalesOrder] = response.items.compactMap { row in
+            let id = row.values["column0"] ?? ""
+            let orderNumber = row.values["column1"] ?? "SO-\(id)"
+            let customerId = row.values["column2"] ?? ""
+            let amount = Decimal(string: row.values["column3"] ?? "0") ?? Decimal(0)
+            let statusRaw = row.values["column4"] ?? "pending_approval"
+            let orderDateStr = row.values["column5"]
+            let notes = row.values["column6"]
+            let dueDateStr = row.values["column7"]
+            let customerName = customerNameMap[customerId] ?? "Customer \(customerId)"
+            let orderDate = NetSuiteDateParser.parseDate(orderDateStr) ?? Date()
+            let dueDate = NetSuiteDateParser.parseDate(dueDateStr)
+            return SalesOrder(
+                id: id,
+                orderNumber: orderNumber,
+                customerId: customerId,
+                customerName: customerName,
+                amount: amount,
+                status: SalesOrder.SalesOrderStatus(rawValue: statusRaw) ?? .pendingApproval,
+                orderDate: orderDate,
+                expectedShipDate: dueDate,
+                netSuiteId: id,
+                items: [], // Items can be fetched separately if needed
+                notes: notes
+            )
+        }
+        
+        print("Debug: NetSuiteAPI - Fetched \(salesOrders.count) sales orders for customer \(customerId)")
+        return salesOrders
+    }
+
+    /// Batch fetch customer names for a set of customer IDs (shared with Invoice logic)
+    private func fetchCustomerNamesBatch(customerIds: [String]) async throws -> [String: String] {
+        guard !customerIds.isEmpty else { return [:] }
+        let idList = customerIds.map { "'\($0)'" }.joined(separator: ",")
+        let suiteQLQuery = "SELECT id, entityid, companyname FROM customer WHERE id IN (\(idList))"
+        let resource = NetSuiteResource.suiteQL(query: suiteQLQuery)
+        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+        var nameMap: [String: String] = [:]
+        for row in response.items {
+            let id = row.values["column0"] ?? ""
+            let entityId = row.values["column1"] ?? ""
+            let companyName = row.values["column2"] ?? ""
+            let name = !entityId.isEmpty ? entityId : (!companyName.isEmpty ? companyName : "Customer \(id)")
+            nameMap[id] = name
+        }
+        return nameMap
     }
     
     func fetchSalesOrder(id: String) async throws -> SalesOrder {
@@ -912,7 +1144,12 @@ class NetSuiteAPI: ObservableObject {
         let endpoint = "/services/rest/record/v1/customerpayment"
         let url = URL(string: baseURL + endpoint)!
         
-        let paymentData = try JSONEncoder().encode(payment)
+        // Convert Payment to NetSuite Customer Payment Record format
+        let netSuitePaymentRecord = NetSuiteCustomerPaymentRecord(payment: payment)
+        let paymentData = try JSONEncoder().encode(netSuitePaymentRecord)
+        
+        print("Debug: NetSuiteAPI - Creating customer payment with data: \(String(data: paymentData, encoding: .utf8) ?? "nil")")
+        
         let request = createRequest(url: url, method: "POST", body: paymentData)
         logRequestDetails(request)
         
@@ -941,16 +1178,21 @@ class NetSuiteAPI: ObservableObject {
             }
             
             // Parse the retry response
-            let createdPayment = try JSONDecoder().decode(Payment.self, from: retryData)
-            return createdPayment
+            let netSuiteResponse = try JSONDecoder().decode(NetSuiteCustomerPaymentResponse.self, from: retryData)
+            return netSuiteResponse.toPayment()
         }
         
         guard httpResponse.statusCode == 201 else {
+            print("Debug: NetSuiteAPI - Create payment failed with status: \(httpResponse.statusCode)")
+            if let errorData = String(data: data, encoding: .utf8) {
+                print("Debug: NetSuiteAPI - Error response: \(errorData)")
+            }
             throw NetSuiteError.requestFailed
         }
         
-        let createdPayment = try JSONDecoder().decode(Payment.self, from: data)
-        return createdPayment
+        // Parse the response
+        let netSuiteResponse = try JSONDecoder().decode(NetSuiteCustomerPaymentResponse.self, from: data)
+        return netSuiteResponse.toPayment()
     }
     
     func fetchPayments() async throws -> [Payment] {
@@ -1000,12 +1242,195 @@ class NetSuiteAPI: ObservableObject {
         return payments
     }
     
+    /// Fetch recent payments from a specific date
+    func fetchRecentPayments(fromDate: Date) async throws -> [Payment] {
+        print("Debug: NetSuiteAPI - Fetching recent payments from date: \(fromDate)")
+        
+        // Validate token before making request
+        try await validateTokenBeforeRequest()
+        
+        // Format date for NetSuite query (YYYY-MM-DD format)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let fromDateString = dateFormatter.string(from: fromDate)
+        
+        // Use SuiteQL to fetch payments with date filtering
+        // Note: Using simplified query that works with NetSuite's transaction table
+        // Fixed: Use string comparison for type field and proper date filtering
+        let query = """
+        SELECT 
+            id,
+            tranid,
+            trandate,
+            status,
+            entity,
+            amount
+        FROM transaction 
+        WHERE type = 'CustPymt' AND trandate >= '\(fromDateString)'
+        ORDER BY trandate DESC
+        """
+        
+        let resource = NetSuiteResource.suiteQL(query: query)
+        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+        
+        // Convert SuiteQL response to Payment objects
+        let payments = response.items.compactMap { item -> Payment? in
+            guard let id = item.values["column0"],
+                  let _ = item.values["column1"], // tranId not used but validates response
+                  let dateString = item.values["column2"],
+                  let date = NetSuiteDateParser.parseDate(dateString),
+                  let customerId = item.values["column4"] else {
+                return nil
+            }
+            
+            let amount = Decimal(string: item.values["column5"] ?? "0") ?? Decimal(0)
+            
+            // Default to tapToPay since we can't get payment method from this query
+            let paymentMethod: Payment.PaymentMethod = .tapToPay
+            
+            return Payment(
+                id: id,
+                amount: amount,
+                status: .succeeded, // NetSuite payments are typically completed
+                paymentMethod: paymentMethod,
+                customerId: customerId,
+                description: nil, // memo not available in simplified query
+                netSuitePaymentId: id,
+                createdDate: date
+            )
+        }
+        
+        print("Debug: NetSuiteAPI - Successfully fetched \(payments.count) recent payments")
+        return payments
+    }
+    
+    /// Fetch customer payments filtered by customer ID and date
+    func fetchCustomerPaymentsFiltered(customerId: String, fromDate: Date) async throws -> [Payment] {
+        print("Debug: NetSuiteAPI - Fetching customer payments for customer: \(customerId), from date: \(fromDate)")
+        
+        // Validate token before making request
+        try await validateTokenBeforeRequest()
+        
+        // Format date for NetSuite query (YYYY-MM-DD format)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let fromDateString = dateFormatter.string(from: fromDate)
+        
+        // Use SuiteQL to fetch payments with customer and date filtering
+        // Note: Using simplified query that works with NetSuite's transaction table
+        // Fixed: Use string comparison for type field and remove table prefix from field names
+        let query = """
+        SELECT 
+            id,
+            tranid,
+            trandate,
+            status,
+            entity,
+            amount
+        FROM transaction 
+        WHERE type = 'CustPymt' 
+        AND entity = '\(customerId)' 
+        AND trandate >= '\(fromDateString)'
+        ORDER BY trandate DESC
+        """
+        
+        let resource = NetSuiteResource.suiteQL(query: query)
+        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+        
+        // Convert SuiteQL response to Payment objects
+        let payments = response.items.compactMap { item -> Payment? in
+            guard let id = item.values["column0"],
+                  let _ = item.values["column1"], // tranId not used but validates response
+                  let dateString = item.values["column2"],
+                  let date = NetSuiteDateParser.parseDate(dateString) else {
+                return nil
+            }
+            
+            let amount = Decimal(string: item.values["column5"] ?? "0") ?? Decimal(0)
+            
+            // Default to tapToPay since we can't get payment method from this query
+            let paymentMethod: Payment.PaymentMethod = .tapToPay
+            
+            return Payment(
+                id: id,
+                amount: amount,
+                status: .succeeded, // NetSuite payments are typically completed
+                paymentMethod: paymentMethod,
+                customerId: customerId,
+                description: nil, // memo not available in simplified query
+                netSuitePaymentId: id,
+                createdDate: date
+            )
+        }
+        
+        print("Debug: NetSuiteAPI - Successfully fetched \(payments.count) customer payments")
+        return payments
+    }
+    
     /// Generic fetch for any NetSuiteResource and Decodable type
     func fetch<T: Decodable>(_ resource: NetSuiteResource, type: T.Type) async throws -> T {
-        print("Debug: NetSuiteAPI - Fetching resource: \(resource.url)")
+        return try await performWithTokenRetry(resource: resource, responseType: T.self) { [self] request in
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("Debug: NetSuiteAPI - Invalid response type")
+                throw NetSuiteError.requestFailed
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                print("Debug: NetSuiteAPI - Request failed with status: \(httpResponse.statusCode)")
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("Debug: NetSuiteAPI - Response body: \(responseString)")
+                }
+                
+                if case .suiteQL = resource {
+                    print("Debug: NetSuiteAPI - SuiteQL request failed - this might be due to query syntax or permissions")
+                }
+                
+                if httpResponse.statusCode == 401 {
+                    throw NetSuiteError.unauthorizedRequest
+                }
+                
+                throw NetSuiteError.requestFailed
+            }
+            
+            logResponseDetails(httpResponse, data: data)
+            return data
+        }
+    }
+    
+    /// Centralized retry logic for token refresh on 401 errors
+    private func performWithTokenRetry<T: Decodable>(
+        resource: NetSuiteResource,
+        responseType: T.Type,
+        networkCall: @escaping (URLRequest) async throws -> Data
+    ) async throws -> T {
+        print("Debug: NetSuiteAPI - Fetching resource: \(resource.url(with: baseURL))")
         
         try await validateTokenBeforeRequest()
-        let url = resource.url
+        let request = createAuthenticatedRequest(for: resource)
+        logRequestDetails(request)
+        
+        do {
+            let data = try await networkCall(request)
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch NetSuiteError.unauthorizedRequest {
+            print("Debug: NetSuiteAPI - 401 error, attempting token refresh and retry")
+            try await handle401Response()
+            
+            // Retry with refreshed token
+            let retryRequest = createAuthenticatedRequest(for: resource)
+            let retryData = try await networkCall(retryRequest)
+            return try JSONDecoder().decode(T.self, from: retryData)
+        } catch {
+            print("Debug: NetSuiteAPI - Failed to decode response: \(error)")
+            throw error
+        }
+    }
+    
+    /// Create an authenticated request for a NetSuite resource
+    private func createAuthenticatedRequest(for resource: NetSuiteResource) -> URLRequest {
+        let url = resource.url(with: baseURL)
         var request = URLRequest(url: url)
         request.httpMethod = resource.method
         request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
@@ -1014,49 +1439,15 @@ class NetSuiteAPI: ObservableObject {
         // Handle SuiteQL POST requests with query in body
         if case .suiteQL(let query) = resource {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("transient", forHTTPHeaderField: "Prefer")
             let queryBody = ["q": query]
-            request.httpBody = try JSONSerialization.data(withJSONObject: queryBody)
+            if let bodyData = try? JSONSerialization.data(withJSONObject: queryBody) {
+                request.httpBody = bodyData
+            }
             print("Debug: NetSuiteAPI - SuiteQL query in body: \(query)")
         }
         
-        logRequestDetails(request)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            print("Debug: NetSuiteAPI - Invalid response type")
-            throw NetSuiteError.requestFailed
-        }
-        
-        print("Debug: NetSuiteAPI - Response status: \(httpResponse.statusCode)")
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            print("Debug: NetSuiteAPI - Request failed with status: \(httpResponse.statusCode)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Debug: NetSuiteAPI - Response body: \(responseString)")
-            }
-            
-            // Create a more specific error for SuiteQL requests
-            if case .suiteQL = resource {
-                print("Debug: NetSuiteAPI - SuiteQL request failed - this might be due to query syntax or permissions")
-            }
-            
-            throw NetSuiteError.requestFailed
-        }
-        
-        logResponseDetails(httpResponse, data: data)
-        
-        do {
-            let decoded = try JSONDecoder().decode(T.self, from: data)
-            print("Debug: NetSuiteAPI - Successfully decoded response to type: \(T.self)")
-            return decoded
-        } catch {
-            print("Debug: NetSuiteAPI - Failed to decode response: \(error)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Debug: NetSuiteAPI - Raw response: \(responseString)")
-            }
-            throw error
-        }
+        return request
     }
     
     /// Execute a SuiteQL query
@@ -1064,6 +1455,182 @@ class NetSuiteAPI: ObservableObject {
         try await validateTokenBeforeRequest()
         let resource = NetSuiteResource.suiteQL(query: query)
         return try await fetch(resource, type: SuiteQLResponse.self)
+    }
+    
+    // MARK: - Invoice Creation Support Methods
+    
+    /// Fetch inventory items for invoice creation
+    func fetchInventoryItems(limit: Int = 100) async throws -> [NetSuiteInventoryItem] {
+        print("Debug: NetSuiteAPI - Fetching inventory items (limit: \(limit))")
+        
+        try await validateTokenBeforeRequest()
+        let query = SuiteQLQuery.inventoryItems(limit: limit)
+        let resource = NetSuiteResource.suiteQL(query: query.query)
+        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+        
+        // Convert SuiteQL response to NetSuiteInventoryItem objects
+        var inventoryItems: [NetSuiteInventoryItem] = []
+        for item in response.items {
+            if let id = item.values["id"],
+               let displayName = item.values["displayname"] {
+                
+                let inventoryItem = NetSuiteInventoryItem(
+                    id: id,
+                    itemId: item.values["itemid"],
+                    displayName: displayName,
+                    description: item.values["description"],
+                    basePrice: 0.0, // baseprice not available in SuiteQL item table
+                    isInactive: item.values["isinactive"] == "T",
+                    itemType: item.values["itemtype"],
+                    location: nil,
+                    subsidiary: nil,
+                    customFieldList: nil
+                )
+                inventoryItems.append(inventoryItem)
+            }
+        }
+        
+        print("Debug: NetSuiteAPI - Successfully fetched \(inventoryItems.count) inventory items")
+        return inventoryItems
+    }
+    
+    /// Fetch invoice templates for invoice creation
+    /// Note: Since form table is not queryable via SuiteQL, we use an alternative approach
+    func fetchInvoiceTemplates(limit: Int = 50) async throws -> [NetSuiteInvoiceTemplate] {
+        print("Debug: NetSuiteAPI - Fetching invoice templates (limit: \(limit))")
+        print("Debug: NetSuiteAPI - Note: Using simplified approach since customform is not joinable in SuiteQL")
+        
+        do {
+            try await validateTokenBeforeRequest()
+            
+            // Simple approach: Get distinct customform IDs from actual invoices
+            // We can't join to customform table, so we'll get IDs and create basic templates
+            let discoverFormsQuery = """
+                SELECT DISTINCT customform
+                FROM transaction
+                WHERE type = 'CustInvc' AND customform IS NOT NULL
+                ORDER BY customform
+                """
+            
+            let resource = NetSuiteResource.suiteQL(query: discoverFormsQuery)
+            let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+            
+            // Convert SuiteQL response to NetSuiteInvoiceTemplate objects
+            var templates: [NetSuiteInvoiceTemplate] = []
+            for item in response.items {
+                if let formId = item.values["customform"],
+                   !formId.isEmpty {
+                    
+                    // Create a basic template with ID, use generic name since we can't get actual names via SuiteQL
+                    let template = NetSuiteInvoiceTemplate(
+                        id: formId,
+                        name: "Invoice Form \(formId)", // Generic name since we can't join to get actual name
+                        isInactive: false, // Assume active since it's being used in invoices
+                        customForm: NetSuiteEntityReference(id: formId, refName: "Invoice Form \(formId)"),
+                        subsidiary: nil,
+                        requiredFields: nil
+                    )
+                    templates.append(template)
+                }
+            }
+            
+            // If no forms found, add a default
+            if templates.isEmpty {
+                let defaultTemplate = NetSuiteInvoiceTemplate(
+                    id: "0", // 0 typically means "use default form" in NetSuite
+                    name: "Default Invoice Form",
+                    isInactive: false,
+                    customForm: NetSuiteEntityReference(id: "0", refName: "Default Invoice Form"),
+                    subsidiary: nil,
+                    requiredFields: nil
+                )
+                templates.append(defaultTemplate)
+            }
+            
+            print("Debug: NetSuiteAPI - Successfully discovered \(templates.count) invoice form IDs from actual usage")
+            return templates
+            
+        } catch {
+            // If the query fails, fall back to a default template
+            print("Debug: NetSuiteAPI - Failed to discover invoice forms from transactions: \(error)")
+            print("Debug: NetSuiteAPI - Falling back to default template approach")
+            
+            // Return a basic default template that should work for most cases
+            let defaultTemplate = NetSuiteInvoiceTemplate(
+                id: "0", // 0 typically means "use default form" in NetSuite
+                name: "Default Invoice Form",
+                isInactive: false,
+                customForm: NetSuiteEntityReference(id: "0", refName: "Default Invoice Form"),
+                subsidiary: nil,
+                requiredFields: nil
+            )
+            
+            return [defaultTemplate]
+        }
+    }
+    
+    /// Fetch locations for invoice creation
+    func fetchLocations(limit: Int = 50) async throws -> [NetSuiteLocation] {
+        print("Debug: NetSuiteAPI - Fetching locations (limit: \(limit))")
+        
+        try await validateTokenBeforeRequest()
+        let query = SuiteQLQuery.locations(limit: limit)
+        let resource = NetSuiteResource.suiteQL(query: query.query)
+        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+        
+        // Convert SuiteQL response to NetSuiteLocation objects
+        var locations: [NetSuiteLocation] = []
+        for item in response.items {
+            if let id = item.values["id"],
+               let name = item.values["name"] {
+                
+                let location = NetSuiteLocation(
+                    id: id,
+                    name: name,
+                    isInactive: item.values["isinactive"] == "T",
+                    subsidiary: nil,
+                    address: nil
+                )
+                locations.append(location)
+            }
+        }
+        
+        print("Debug: NetSuiteAPI - Successfully fetched \(locations.count) locations")
+        return locations
+    }
+    
+    /// Create an invoice in NetSuite
+    func createInvoice(request: NetSuiteInvoiceCreationRequest) async throws -> NetSuiteInvoiceRecord {
+        print("Debug: NetSuiteAPI - Creating invoice for customer: \(request.entity.refName ?? "Unknown")")
+        
+        try await validateTokenBeforeRequest()
+        let endpoint = "/services/rest/record/v1/invoice"
+        let url = URL(string: baseURL + endpoint)!
+        
+        let requestData = try JSONEncoder().encode(request)
+        let urlRequest = createRequest(url: url, method: "POST", body: requestData)
+        
+        logRequestDetails(urlRequest)
+        
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetSuiteError.requestFailed
+        }
+        
+        logResponseDetails(httpResponse, data: data)
+        
+        guard httpResponse.statusCode == 201 else {
+            print("Debug: NetSuiteAPI - Invoice creation failed with status: \(httpResponse.statusCode)")
+            if let errorData = String(data: data, encoding: .utf8) {
+                print("Debug: NetSuiteAPI - Error response: \(errorData)")
+            }
+            throw NetSuiteError.requestFailed
+        }
+        
+        let createdInvoice = try JSONDecoder().decode(NetSuiteInvoiceRecord.self, from: data)
+        print("Debug: NetSuiteAPI - Successfully created invoice: \(createdInvoice.tranId ?? "Unknown")")
+        return createdInvoice
     }
 
     /// Debug method to test both ID formats and help identify which format works for detail API calls.
@@ -1103,6 +1670,68 @@ class NetSuiteAPI: ObservableObject {
         }
     }
 
+    /// Debug method to analyze the structure of a NetSuite API response
+    func debugResponseStructure(for resource: NetSuiteResource) async {
+        print("Debug: NetSuiteAPI - Analyzing response structure for: \(resource.url(with: baseURL))")
+        
+        do {
+            try await validateTokenBeforeRequest()
+            let url = resource.url(with: baseURL)
+            var request = URLRequest(url: url)
+            request.httpMethod = resource.method
+            request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            
+            // Handle SuiteQL POST requests with query in body
+            if case .suiteQL(let query) = resource {
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("transient", forHTTPHeaderField: "Prefer")
+                let queryBody = ["q": query]
+                request.httpBody = try JSONSerialization.data(withJSONObject: queryBody)
+                print("Debug: NetSuiteAPI - SuiteQL query in body: \(query)")
+            }
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("Debug: NetSuiteAPI - Invalid response type")
+                return
+            }
+            
+            print("Debug: NetSuiteAPI - Response status: \(httpResponse.statusCode)")
+            
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("Debug: NetSuiteAPI - Response structure analysis:")
+                print("  - Response length: \(responseString.count) characters")
+                print("  - First 500 characters: \(String(responseString.prefix(500)))")
+                
+                // Try to parse as JSON and analyze structure
+                if let jsonData = responseString.data(using: String.Encoding.utf8),
+                   let jsonObject = try? JSONSerialization.jsonObject(with: jsonData),
+                   let jsonDict = jsonObject as? [String: Any] {
+                    
+                    print("Debug: NetSuiteAPI - JSON structure:")
+                    for (key, value) in jsonDict {
+                        let valueType = type(of: value)
+                        let valueDescription: String
+                        
+                        if let array = value as? [Any] {
+                            valueDescription = "Array with \(array.count) items"
+                        } else if let dict = value as? [String: Any] {
+                            valueDescription = "Dictionary with \(dict.count) keys"
+                        } else {
+                            valueDescription = "\(value)"
+                        }
+                        
+                        print("  - \(key): \(valueType) = \(valueDescription)")
+                    }
+                }
+            }
+        } catch {
+            print("Debug: NetSuiteAPI - Failed to analyze response structure: \(error)")
+        }
+    }
+
     /// Test SuiteQL functionality
     func testSuiteQL() async {
         print("Debug: NetSuiteAPI - Testing SuiteQL functionality...")
@@ -1121,6 +1750,179 @@ class NetSuiteAPI: ObservableObject {
             print("Debug: NetSuiteAPI - ❌ SuiteQL test failed: \(error)")
         }
     }
+    
+    // MARK: - SuiteQL Service Methods for Customer Data
+    
+    /// Fetch customer invoices using SuiteQL with proper pagination
+    func fetchCustomerInvoices(for customerId: String, offset: Int = 0) async throws -> [SuiteQLInvoiceRecord] {
+        print("Debug: NetSuiteAPI - Fetching customer invoices for customer: \(customerId), offset: \(offset)")
+        
+        let query = """
+        SELECT
+            t.id,
+            t.tranid,
+            t.trandate,
+            t.status,
+            t.memo,
+            t.entity
+        FROM transaction t
+        WHERE t.entity = '\(customerId)' AND t.type = 'CustInvc'
+        ORDER BY t.trandate DESC
+        """
+        
+        let url = "\(baseURL)/services/rest/query/v1/suiteql?limit=50&offset=\(offset)"
+        var request = URLRequest(url: URL(string: url)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
+        request.setValue("transient", forHTTPHeaderField: "Prefer")
+        
+        let payload = ["q": query]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        
+        print("Debug: NetSuiteAPI - Customer invoices SuiteQL query: \(query)")
+        print("Debug: NetSuiteAPI - Request URL: \(url)")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            print("Debug: NetSuiteAPI - Customer invoices request failed with status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+            throw NetSuiteError.invalidResponse
+        }
+        
+        let decoded = try JSONDecoder().decode(SuiteQLGenericResponse<SuiteQLInvoiceRecord>.self, from: data)
+        print("Debug: NetSuiteAPI - Successfully fetched \(decoded.items.count) customer invoices")
+        return decoded.items
+    }
+    
+    /// Fetch customer payments using SuiteQL with proper pagination
+    func fetchCustomerPayments(for customerId: String, offset: Int = 0) async throws -> [SuiteQLPaymentRecord] {
+        print("Debug: NetSuiteAPI - Fetching customer payments for customer: \(customerId), offset: \(offset)")
+        
+        let query = """
+        SELECT
+            t.id,
+            t.tranid,
+            t.trandate,
+            t.status,
+            t.memo,
+            t.entity,
+            t.amount
+        FROM transaction t
+        WHERE t.entity = '\(customerId)' AND t.type = 'CustPymt'
+        ORDER BY t.trandate DESC
+        """
+        
+        let url = "\(baseURL)/services/rest/query/v1/suiteql?limit=50&offset=\(offset)"
+        var request = URLRequest(url: URL(string: url)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
+        request.setValue("transient", forHTTPHeaderField: "Prefer")
+        
+        let payload = ["q": query]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        
+        print("Debug: NetSuiteAPI - Customer payments SuiteQL query: \(query)")
+        print("Debug: NetSuiteAPI - Request URL: \(url)")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            print("Debug: NetSuiteAPI - Customer payments request failed with status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+            throw NetSuiteError.invalidResponse
+        }
+        
+        let decoded = try JSONDecoder().decode(SuiteQLGenericResponse<SuiteQLPaymentRecord>.self, from: data)
+        print("Debug: NetSuiteAPI - Successfully fetched \(decoded.items.count) customer payments")
+        return decoded.items
+    }
+    
+    /// Fetch customer transactions (both invoices and payments) using SuiteQL
+    func fetchCustomerTransactions(for customerId: String, offset: Int = 0) async throws -> [CustomerTransaction] {
+        print("Debug: NetSuiteAPI - Fetching customer transactions for customer: \(customerId), offset: \(offset)")
+        
+        let query = """
+        SELECT
+            t.id,
+            t.tranid,
+            t.trandate,
+            t.status,
+            t.memo,
+            t.entity,
+            t.type
+        FROM transaction t
+        WHERE t.entity = '\(customerId)' AND (t.type = 'CustInvc' OR t.type = 'CustPymt')
+        ORDER BY t.trandate DESC
+        """
+        
+        let url = "\(baseURL)/services/rest/query/v1/suiteql?limit=50&offset=\(offset)"
+        var request = URLRequest(url: URL(string: url)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
+        request.setValue("transient", forHTTPHeaderField: "Prefer")
+        
+        let payload = ["q": query]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        
+        print("Debug: NetSuiteAPI - Customer transactions SuiteQL query: \(query)")
+        print("Debug: NetSuiteAPI - Request URL: \(url)")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            print("Debug: NetSuiteAPI - Customer transactions request failed with status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+            throw NetSuiteError.invalidResponse
+        }
+        
+        // Parse as generic SuiteQL response and convert to CustomerTransaction
+        let decoded = try JSONDecoder().decode(SuiteQLResponse.self, from: data)
+        
+        let transactions = decoded.items.compactMap { item -> CustomerTransaction? in
+            guard let id = item.id,
+                  let tranId = item.tranid,
+                  let dateString = item.trandate,
+                  let date = NetSuiteDateParser.parseDate(dateString),
+                  let type = item.type,
+                  let status = item.status else {
+                return nil
+            }
+            
+            return CustomerTransaction(
+                id: id,
+                transactionNumber: tranId,
+                date: date,
+                amount: Decimal(0), // SuiteQL doesn't provide amount
+                type: type,
+                status: status,
+                memo: item.memo
+            )
+        }
+        
+        print("Debug: NetSuiteAPI - Successfully fetched \(transactions.count) customer transactions")
+        return transactions
+    }
+    
+    // MARK: - Debug Utilities
+    
+    /// Debug method to discover available columns for a SuiteQL table
+    /// Usage: await netSuiteAPI.debugTableColumns("transaction")
+    func debugTableColumns(_ tableName: String) async throws -> [String] {
+        let query = """
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = '\(tableName)'
+        ORDER BY COLUMN_NAME
+        """
+        
+        let resource = NetSuiteResource.suiteQL(query: query)
+        let response: SuiteQLResponse = try await fetch(resource, type: SuiteQLResponse.self)
+        
+        let columns = response.items.compactMap { $0.values["column0"] }
+        print("Debug: Available columns for table '\(tableName)': \(columns.joined(separator: ", "))")
+        return columns
+    }
 }
 
 // MARK: - Errors
@@ -1130,6 +1932,7 @@ enum NetSuiteError: Error, LocalizedError {
     case invalidResponse
     case authenticationFailed
     case invalidURL
+    case unauthorizedRequest
     
     var errorDescription: String? {
         switch self {
@@ -1143,6 +1946,8 @@ enum NetSuiteError: Error, LocalizedError {
             return "NetSuite authentication failed."
         case .invalidURL:
             return "Invalid URL for NetSuite API request."
+        case .unauthorizedRequest:
+            return "NetSuite request unauthorized (401). Token refresh required."
         }
     }
 }
