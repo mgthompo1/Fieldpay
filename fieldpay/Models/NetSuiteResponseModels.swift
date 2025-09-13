@@ -1,706 +1,389 @@
 import Foundation
 
-// MARK: - NetSuite API Response Models
+// MARK: - Common Types (unified across the app)
 
-// Generic NetSuite response wrapper
-struct NetSuiteResponse<T: Codable>: Codable {
-    let links: [NetSuiteLink]?
-    let count: Int?
-    let hasMore: Bool?
-    let offset: Int?
-    let totalResults: Int?
-    let items: [T]
-    
-    enum CodingKeys: String, CodingKey {
-        case links = "links"
-        case count = "count"
-        case hasMore = "hasMore"
-        case offset = "offset"
-        case totalResults = "totalResults"
-        case items = "items"
-    }
+public struct Link: Codable { public let rel: String; public let href: String }
+
+/// Generic reference model for NetSuite entities
+public struct Reference: Codable {
+    public let id: String?
+    public let refName: String?
+    public let type: String?
 }
 
-struct NetSuiteLink: Codable {
-    let rel: String
-    let href: String
+public typealias EntityReference = Reference
+public typealias CurrencyReference = Reference
+public typealias LocationReference = Reference
+
+// MARK: - Generic NetSuite response wrapper (use this everywhere)
+
+public struct NetSuiteResponse<T: Codable>: Codable {
+    public let links: [Link]?
+    public let count: Int?
+    public let hasMore: Bool?
+    public let offset: Int?
+    public let totalResults: Int?
+    public let items: [T]
 }
 
-// MARK: - Enhanced Status Enums
+// Convenience aliases for existing call sites
+public typealias NetSuiteInvoiceListResponse = NetSuiteResponse<InvoiceItem>
+public typealias NetSuiteCustomerListResponse = NetSuiteResponse<CustomerItem>
+public typealias NetSuitePaymentListResponse  = NetSuiteResponse<PaymentItem>
+public typealias CustomerTransactionResponse = NetSuiteResponse<TransactionItem>
+public typealias CustomerPaymentResponse     = NetSuiteResponse<NetSuiteCustomerPaymentRecord>
 
-enum NetSuiteInvoiceStatus: String, CaseIterable {
-    case paid = "paid"
-    case overdue = "overdue"
-    case cancelled = "cancelled"
-    case pending = "pending"
-    case draft = "draft"
-    case approved = "approved"
-    case closed = "closed"
-    case unknown = "unknown"
-    
-    init(rawValue: String?) {
-        guard let rawValue = rawValue?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else {
-            self = .unknown
-            return
-        }
-        
-        switch rawValue {
-        case "paid", "payment_received":
-            self = .paid
-        case "overdue", "past_due":
-            self = .overdue
-        case "cancelled", "canceled", "void":
-            self = .cancelled
-        case "pending", "open":
-            self = .pending
-        case "draft":
-            self = .draft
-        case "approved":
-            self = .approved
-        case "closed":
-            self = .closed
-        default:
-            self = .unknown
-        }
-    }
-}
+// MARK: - Helpers
 
-// MARK: - Enhanced Date Parsing
-
-struct NetSuiteDateParser {
-    private static let iso8601Formatter = ISO8601DateFormatter()
-    private static let iso8601WithFractionalSecondsFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-    private static let dateOnlyFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }()
-    private static let fullDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }()
-    
-    // Add NetSuite common date formats
-    private static let netSuiteShortDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M/d/yyyy"  // 2/28/2018
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }()
-    
-    private static let netSuiteMediumDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd/yyyy"  // 02/28/2018
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }()
-    
-    private static let netSuiteDateTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M/d/yyyy h:mm a"  // 2/28/2018 3:30 PM
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }()
-    
-    private static let netSuiteDateTimeFullFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M/d/yyyy HH:mm:ss"  // 2/28/2018 15:30:00
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }()
-    
-    static func parseDate(_ dateString: String?) -> Date? {
-        guard let dateString = dateString?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !dateString.isEmpty else {
-            return nil
-        }
-        
-        // Try ISO8601 formatters first
-        if let date = iso8601Formatter.date(from: dateString) {
-            return date
-        }
-        
-        if let date = iso8601WithFractionalSecondsFormatter.date(from: dateString) {
-            return date
-        }
-        
-        // Try standard DateFormatter formats
-        if let date = fullDateFormatter.date(from: dateString) {
-            return date
-        }
-        
-        if let date = dateOnlyFormatter.date(from: dateString) {
-            return date
-        }
-        
-        // Try NetSuite specific formats
-        if let date = netSuiteShortDateFormatter.date(from: dateString) {
-            return date
-        }
-        
-        if let date = netSuiteMediumDateFormatter.date(from: dateString) {
-            return date
-        }
-        
-        if let date = netSuiteDateTimeFormatter.date(from: dateString) {
-            return date
-        }
-        
-        if let date = netSuiteDateTimeFullFormatter.date(from: dateString) {
-            return date
-        }
-        
-        // Log parsing failure for debugging
-        print("⚠️ DEBUG: NetSuiteDateParser - Failed to parse date: '\(dateString)'")
+/// Decode numbers that may arrive as JSON number or string
+enum LooseNumber {
+    static func double<T: CodingKey>(_ c: KeyedDecodingContainer<T>, _ key: T) -> Double? {
+        if let d = try? c.decode(Double.self, forKey: key) { return d }
+        if let s = try? c.decode(String.self, forKey: key), let d = Double(s) { return d }
         return nil
     }
-    
-    static func parseDateWithFallback(_ dateString: String?, fallback: Date = Date()) -> Date {
-        return parseDate(dateString) ?? fallback
+}
+
+// MARK: - Date Parsing (shared)
+
+public struct NetSuiteDateParser {
+    private static let iso = ISO8601DateFormatter()
+    private static let isoFrac: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let dateOnly: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current; return f
+    }()
+    private static let full: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"; f.timeZone = .current; return f
+    }()
+    private static let nsShort: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "M/d/yyyy"; f.timeZone = .current; return f
+    }()
+    private static let nsMedium: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MM/dd/yyyy"; f.timeZone = .current; return f
+    }()
+    private static let nsDateTime: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "M/d/yyyy h:mm a"; f.timeZone = .current; return f
+    }()
+    private static let nsDateTimeFull: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "M/d/yyyy HH:mm:ss"; f.timeZone = .current; return f
+    }()
+
+    public static func parseDate(_ s: String?) -> Date? {
+        guard let s = s?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
+        if let d = iso.date(from: s) { return d }
+        if let d = isoFrac.date(from: s) { return d }
+        if let d = full.date(from: s) { return d }
+        if let d = dateOnly.date(from: s) { return d }
+        if let d = nsShort.date(from: s) { return d }
+        if let d = nsMedium.date(from: s) { return d }
+        if let d = nsDateTime.date(from: s) { return d }
+        if let d = nsDateTimeFull.date(from: s) { return d }
+        print("⚠️ DEBUG: NetSuiteDateParser - Failed to parse date: '\(s)'")
+        return nil
     }
+
+    public static func parseDateWithFallback(_ s: String?, fallback: Date = Date()) -> Date { parseDate(s) ?? fallback }
 }
 
-// MARK: - Enhanced Customer Response Model
+// MARK: - Customer Models
 
-struct NetSuiteCustomerResponse: Codable {
-    let id: String
-    let entityId: String?
-    let companyName: String?
-    let firstName: String?
-    let lastName: String?
-    let email: String?
-    let phone: String?
-    let addressbookList: NetSuiteAddressBookList?
-    let isInactive: Bool?
-    let dateCreated: String?
-    let lastModifiedDate: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case id = "id"
-        case entityId = "entityId"
-        case companyName = "companyName"
-        case firstName = "firstName"
-        case lastName = "lastName"
-        case email = "email"
-        case phone = "phone"
-        case addressbookList = "addressbookList"
-        case isInactive = "isInactive"
-        case dateCreated = "dateCreated"
-        case lastModifiedDate = "lastModifiedDate"
-    }
+public struct NetSuiteCustomerResponse: Codable {
+    public let id: String
+    public let entityId: String?
+    public let companyName: String?
+    public let firstName: String?
+    public let lastName: String?
+    public let email: String?
+    public let phone: String?
+    public let addressbookList: NetSuiteAddressBookList?
+    public let isInactive: Bool?
+    public let dateCreated: String?
+    public let lastModifiedDate: String?
 }
 
-struct NetSuiteAddressBookList: Codable {
-    let addressbook: [NetSuiteAddress]?
+public struct NetSuiteAddressBookList: Codable { public let addressbook: [NetSuiteAddress]? }
+
+public struct NetSuiteAddress: Codable {
+    public let addr1: String?
+    public let addr2: String?
+    public let city: String?
+    public let state: String?
+    public let zip: String?
+    public let country: String?
+    public let isResidential: Bool?
+    public let isDefaultBilling: Bool?
+    public let isDefaultShipping: Bool?
+
+    public var isDefault: Bool { isDefaultBilling == true || isDefaultShipping == true }
+    public var fullAddress: String { [addr1, addr2, city, state, zip, country].compactMap{ $0 }.joined(separator: ", ") }
 }
-
-struct NetSuiteAddress: Codable {
-    let addr1: String?
-    let addr2: String?
-    let city: String?
-    let state: String?
-    let zip: String?
-    let country: String?
-    let isResidential: Bool?
-    let isDefaultBilling: Bool?
-    let isDefaultShipping: Bool?
-    
-    var isDefault: Bool {
-        return isDefaultBilling == true || isDefaultShipping == true
-    }
-    
-    var fullAddress: String {
-        let components = [addr1, addr2, city, state, zip, country].compactMap { $0 }
-        return components.joined(separator: ", ")
-    }
-}
-
-// MARK: - Enhanced Invoice Response Model
-
-struct NetSuiteInvoiceResponse: Codable {
-    let id: String
-    let tranId: String?
-    let entity: NetSuiteEntityReference?
-    let tranDate: String?
-    let dueDate: String?
-    let total: Double?
-    let amountRemaining: Double?
-    let memo: String?
-    let status: NetSuiteStatus?
-    let item: NetSuiteItemReference?
-    let createdDate: String?
-    let lastModifiedDate: String?
-    let amountPaid: Double?
-    let billAddress: String?
-    let shipAddress: String?
-    let email: String?
-    let customForm: NetSuiteEntityReference?
-    let location: NetSuiteEntityReference?
-    let subsidiary: NetSuiteEntityReference?
-    let terms: NetSuiteEntityReference?
-    let currency: NetSuiteEntityReference?
-    let postingPeriod: NetSuiteEntityReference?
-    let source: NetSuiteEntityReference?
-    let originator: String?
-    let toBeEmailed: Bool?
-    let toBeFaxed: Bool?
-    let toBePrinted: Bool?
-    let shipDate: String?
-    let shipIsResidential: Bool?
-    let shipOverride: Bool?
-    let estGrossProfit: Double?
-    let estGrossProfitPercent: Double?
-    let exchangeRate: Double?
-    let totalCostEstimate: Double?
-    let subtotal: Double?
-    
-    enum CodingKeys: String, CodingKey {
-        case id = "id"
-        case tranId = "tranId"
-        case entity = "entity"
-        case tranDate = "tranDate"
-        case dueDate = "dueDate"
-        case total = "total"
-        case amountRemaining = "amountRemaining"
-        case memo = "memo"
-        case status = "status"
-        case item = "item"
-        case createdDate = "createdDate"
-        case lastModifiedDate = "lastModifiedDate"
-        case amountPaid = "amountPaid"
-        case billAddress = "billAddress"
-        case shipAddress = "shipAddress"
-        case email = "email"
-        case customForm = "customForm"
-        case location = "location"
-        case subsidiary = "subsidiary"
-        case terms = "terms"
-        case currency = "currency"
-        case postingPeriod = "postingPeriod"
-        case source = "source"
-        case originator = "originator"
-        case toBeEmailed = "toBeEmailed"
-        case toBeFaxed = "toBeFaxed"
-        case toBePrinted = "toBePrinted"
-        case shipDate = "shipDate"
-        case shipIsResidential = "shipIsResidential"
-        case shipOverride = "shipOverride"
-        case estGrossProfit = "estGrossProfit"
-        case estGrossProfitPercent = "estGrossProfitPercent"
-        case exchangeRate = "exchangeRate"
-        case totalCostEstimate = "totalCostEstimate"
-        case subtotal = "subtotal"
-    }
-}
-
-struct NetSuiteStatus: Codable {
-    let id: String?
-    let refName: String?
-}
-
-struct NetSuiteItemReference: Codable {
-    let links: [NetSuiteLink]?
-}
-
-struct NetSuiteEntityReference: Codable {
-    let id: String?
-    let refName: String?
-}
-
-struct NetSuiteItemList: Codable {
-    let item: [NetSuiteInvoiceItem]?
-}
-
-struct NetSuiteInvoiceItem: Codable {
-    let item: NetSuiteEntityReference?
-    let description: String?
-    let quantity: Double?
-    let rate: Double?
-    let amount: Double?
-    let grossAmount: Double?
-    
-    // Enhanced null safety with validation
-    var validatedQuantity: Double {
-        guard let quantity = quantity, quantity > 0 else {
-            print("⚠️ DEBUG: NetSuiteInvoiceItem - Invalid quantity: \(quantity ?? 0), using 1.0")
-            return 1.0
-        }
-        return quantity
-    }
-    
-    var validatedRate: Double {
-        guard let rate = rate, rate >= 0 else {
-            print("⚠️ DEBUG: NetSuiteInvoiceItem - Invalid rate: \(rate ?? 0), using 0.0")
-            return 0.0
-        }
-        return rate
-    }
-    
-    var validatedAmount: Double {
-        guard let amount = amount, amount >= 0 else {
-            print("⚠️ DEBUG: NetSuiteInvoiceItem - Invalid amount: \(amount ?? 0), calculating from quantity * rate")
-            return validatedQuantity * validatedRate
-        }
-        return amount
-    }
-}
-
-// MARK: - Enhanced Conversion Extensions
 
 extension NetSuiteCustomerResponse {
     func toCustomer() -> Customer {
-        // Enhanced name handling with better fallback logic
-        let trimmedFirstName = firstName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedLastName = lastName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedCompanyName = companyName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedEntityId = entityId?.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Build display name with priority: firstName + lastName > companyName > entityId > fallback
-        let displayName: String
-        if let firstName = trimmedFirstName, let lastName = trimmedLastName, !firstName.isEmpty, !lastName.isEmpty {
-            displayName = "\(firstName) \(lastName)"
-        } else if let firstName = trimmedFirstName, !firstName.isEmpty {
-            displayName = firstName
-        } else if let lastName = trimmedLastName, !lastName.isEmpty {
-            displayName = lastName
-        } else if let companyName = trimmedCompanyName, !companyName.isEmpty {
-            displayName = companyName
-        } else if let entityId = trimmedEntityId, !entityId.isEmpty {
-            displayName = entityId
-        } else {
-            displayName = "Customer \(id)"
-        }
-        
-        // Enhanced address handling with multiple address support
+        let f = firstName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let l = lastName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let co = companyName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ent = entityId?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let displayName: String = {
+            if let f = f, let l = l, !f.isEmpty, !l.isEmpty { return "\(f) \(l)" }
+            if let f = f, !f.isEmpty { return f }
+            if let l = l, !l.isEmpty { return l }
+            if let co = co, !co.isEmpty { return co }
+            if let ent = ent, !ent.isEmpty { return ent }
+            return "Customer \(id)"
+        }()
+
         let addresses = addressbookList?.addressbook ?? []
-        let primaryAddress = addresses.first { $0.isDefault } ?? addresses.first
-        
-        let address = primaryAddress.map { addr in
+        let primary = addresses.first { $0.isDefault } ?? addresses.first
+        let address = primary.map { a in
             Customer.Address(
-                street: [addr.addr1, addr.addr2]
-                    .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-                    .filter { !$0.isEmpty }
-                    .joined(separator: " "),
-                city: addr.city?.trimmingCharacters(in: .whitespacesAndNewlines),
-                state: addr.state?.trimmingCharacters(in: .whitespacesAndNewlines),
-                zipCode: addr.zip?.trimmingCharacters(in: .whitespacesAndNewlines),
-                country: addr.country?.trimmingCharacters(in: .whitespacesAndNewlines)
+                street: [a.addr1, a.addr2].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter{ !$0.isEmpty }.joined(separator: " "),
+                city: a.city?.trimmingCharacters(in: .whitespacesAndNewlines),
+                state: a.state?.trimmingCharacters(in: .whitespacesAndNewlines),
+                zipCode: a.zip?.trimmingCharacters(in: .whitespacesAndNewlines),
+                country: a.country?.trimmingCharacters(in: .whitespacesAndNewlines)
             )
         }
-        
-        // Enhanced date parsing with fallbacks
-        let createdDate = NetSuiteDateParser.parseDateWithFallback(dateCreated)
-        let modifiedDate = NetSuiteDateParser.parseDateWithFallback(lastModifiedDate, fallback: createdDate)
-        
-        // Enhanced email validation
-        let validatedEmail = email?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? email : nil
-        
-        // Enhanced phone validation
-        let validatedPhone = phone?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? phone : nil
-        
+
+        let created = NetSuiteDateParser.parseDateWithFallback(dateCreated)
+        let modified = NetSuiteDateParser.parseDateWithFallback(lastModifiedDate, fallback: created)
+
+        let emailClean = (email?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? email : nil
+        let phoneClean = (phone?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? phone : nil
+
         return Customer(
-            id: id, // Use NetSuite ID directly for consistency
+            id: id,
             name: displayName,
-            email: validatedEmail,
-            phone: validatedPhone,
+            email: emailClean,
+            phone: phoneClean,
             address: address,
             netSuiteId: entityId,
-            companyName: companyName?.trimmingCharacters(in: .whitespacesAndNewlines),
+            companyName: co,
             isActive: !(isInactive ?? false),
-            createdDate: createdDate,
-            lastModifiedDate: modifiedDate
+            createdDate: created,
+            lastModifiedDate: modified
         )
     }
 }
 
+// MARK: - Invoice (Record) Response Model (lightweight)
+
+public struct NetSuiteStatus: Codable { public let id: String?; public let refName: String? }
+
+public struct NetSuiteInvoiceResponse: Codable {
+    public let id: String
+    public let tranId: String?
+    public let entity: EntityReference?
+    public let tranDate: String?
+    public let dueDate: String?
+    public let total: Double?
+    public let amountRemaining: Double?
+    public let memo: String?
+    public let status: NetSuiteStatus?
+    let item: ItemList? // preferred; falls back from links-only shape in init
+    public let createdDate: String?
+    public let lastModifiedDate: String?
+    public let amountPaid: Double?
+    public let billAddress: String?
+    public let shipAddress: String?
+    public let email: String?
+    public let customForm: EntityReference?
+    public let location: EntityReference?
+    public let subsidiary: EntityReference?
+    public let terms: EntityReference?
+    public let currency: EntityReference?
+    public let postingPeriod: EntityReference?
+    public let source: EntityReference?
+    public let originator: String?
+    public let toBeEmailed: Bool?
+    public let toBeFaxed: Bool?
+    public let toBePrinted: Bool?
+    public let shipDate: String?
+    public let shipIsResidential: Bool?
+    public let shipOverride: Bool?
+    public let estGrossProfit: Double?
+    public let estGrossProfitPercent: Double?
+    public let exchangeRate: Double?
+    public let totalCostEstimate: Double?
+    public let subtotal: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id, tranId, entity, tranDate, dueDate, total, amountRemaining, memo, status, item, createdDate, lastModifiedDate, amountPaid, billAddress, shipAddress, email, customForm, location, subsidiary, terms, currency, postingPeriod, source, originator, toBeEmailed, toBeFaxed, toBePrinted, shipDate, shipIsResidential, shipOverride, estGrossProfit, estGrossProfitPercent, exchangeRate, totalCostEstimate, subtotal
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        tranId = try c.decodeIfPresent(String.self, forKey: .tranId)
+        entity = try c.decodeIfPresent(EntityReference.self, forKey: .entity)
+        tranDate = try c.decodeIfPresent(String.self, forKey: .tranDate)
+        dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
+        total = LooseNumber.double(c, .total)
+        amountRemaining = LooseNumber.double(c, .amountRemaining)
+        memo = try c.decodeIfPresent(String.self, forKey: .memo)
+        status = try c.decodeIfPresent(NetSuiteStatus.self, forKey: .status)
+        createdDate = try c.decodeIfPresent(String.self, forKey: .createdDate)
+        lastModifiedDate = try c.decodeIfPresent(String.self, forKey: .lastModifiedDate)
+        amountPaid = LooseNumber.double(c, .amountPaid)
+        billAddress = try c.decodeIfPresent(String.self, forKey: .billAddress)
+        shipAddress = try c.decodeIfPresent(String.self, forKey: .shipAddress)
+        email = try c.decodeIfPresent(String.self, forKey: .email)
+        customForm = try c.decodeIfPresent(EntityReference.self, forKey: .customForm)
+        location = try c.decodeIfPresent(EntityReference.self, forKey: .location)
+        subsidiary = try c.decodeIfPresent(EntityReference.self, forKey: .subsidiary)
+        terms = try c.decodeIfPresent(EntityReference.self, forKey: .terms)
+        currency = try c.decodeIfPresent(EntityReference.self, forKey: .currency)
+        postingPeriod = try c.decodeIfPresent(EntityReference.self, forKey: .postingPeriod)
+        source = try c.decodeIfPresent(EntityReference.self, forKey: .source)
+        originator = try c.decodeIfPresent(String.self, forKey: .originator)
+        toBeEmailed = try c.decodeIfPresent(Bool.self, forKey: .toBeEmailed)
+        toBeFaxed = try c.decodeIfPresent(Bool.self, forKey: .toBeFaxed)
+        toBePrinted = try c.decodeIfPresent(Bool.self, forKey: .toBePrinted)
+        shipDate = try c.decodeIfPresent(String.self, forKey: .shipDate)
+        shipIsResidential = try c.decodeIfPresent(Bool.self, forKey: .shipIsResidential)
+        shipOverride = try c.decodeIfPresent(Bool.self, forKey: .shipOverride)
+        estGrossProfit = LooseNumber.double(c, .estGrossProfit)
+        estGrossProfitPercent = LooseNumber.double(c, .estGrossProfitPercent)
+        exchangeRate = LooseNumber.double(c, .exchangeRate)
+        totalCostEstimate = LooseNumber.double(c, .totalCostEstimate)
+        subtotal = LooseNumber.double(c, .subtotal)
+
+        // Try to decode lines. Sometimes REST returns an object with just links; ignore that shape.
+        if let list = try? c.decode(ItemList.self, forKey: .item) {
+            item = list
+        } else {
+            _ = try? c.decode(NetSuiteItemReference.self, forKey: .item) // discard links-only shape
+            item = nil
+        }
+    }
+}
+
+public struct NetSuiteItemReference: Codable { public let links: [Link]? }
+
 extension NetSuiteInvoiceResponse {
     func toInvoice() -> Invoice {
-        // Enhanced date parsing with fallbacks
-        let createdDate = NetSuiteDateParser.parseDateWithFallback(createdDate)
-        let _ = NetSuiteDateParser.parseDateWithFallback(lastModifiedDate, fallback: createdDate)
-        let dueDate = NetSuiteDateParser.parseDate(dueDate)
-        
-        // For now, we'll create empty items since the item structure is different
-        // TODO: Implement proper item parsing when we have the correct structure
-        let items: [Invoice.InvoiceItem] = []
-        
-        // Enhanced status mapping using enum
-        let statusString = status?.id ?? status?.refName ?? "unknown"
-        let netSuiteStatus = NetSuiteInvoiceStatus(rawValue: statusString)
-        let invoiceStatus: Invoice.InvoiceStatus
-        
-        switch netSuiteStatus {
-        case .paid:
-            invoiceStatus = .paid
-        case .overdue:
-            invoiceStatus = .overdue
-        case .cancelled:
-            invoiceStatus = .cancelled
-        case .pending, .draft, .approved, .closed, .unknown:
-            invoiceStatus = .pending
-        case .none:
-            invoiceStatus = .pending
+        let created = NetSuiteDateParser.parseDateWithFallback(createdDate)
+        let due = NetSuiteDateParser.parseDate(dueDate)
+
+        let statusRaw = status?.refName ?? status?.id
+        // Uses InvoiceStatus.parse from your InvoiceRecord file
+        let parsed = InvoiceStatus.parse(statusRaw)
+        let appStatus: AppInvoiceStatus
+        switch parsed {
+        case .paidInFull: appStatus = .paid
+        case .closed: appStatus = .cancelled
+        case .partiallyPaid:
+            if let d = due, d < Date() { appStatus = .overdue } else { appStatus = .pending }
+        default: appStatus = .pending
         }
-        
-        // Enhanced amount validation with NaN protection
+
         let rawTotal = total ?? 0
-        let rawBalance = amountRemaining ?? rawTotal
-        
-        // Check for NaN or infinite values and handle large numbers safely
-        let validatedTotal: Double
-        if rawTotal.isNaN || rawTotal.isInfinite {
-            validatedTotal = 0
-        } else if rawTotal > 1_000_000_000 { // Handle extremely large numbers
-            validatedTotal = 0
-        } else {
-            validatedTotal = max(0, rawTotal)
-        }
-        
-        let validatedBalance: Double
-        if rawBalance.isNaN || rawBalance.isInfinite {
-            validatedBalance = 0
-        } else if rawBalance > 1_000_000_000 { // Handle extremely large numbers
-            validatedBalance = 0
-        } else {
-            validatedBalance = max(0, rawBalance)
-        }
-        
-        // Enhanced invoice number generation
-        let invoiceNumber = tranId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false 
-            ? tranId! 
-            : "INV-\(id)"
-        
-        // Enhanced customer information
-        let customerId = entity?.id ?? ""
+        let rawRemain = amountRemaining ?? rawTotal
+        let safeTotal = rawTotal.isFinite ? max(0, rawTotal) : 0
+        let safeRemain = rawRemain.isFinite ? max(0, rawRemain) : 0
+
+        let number = (tranId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? tranId! : "INV-\(id)"
         let customerName = entity?.refName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Customer \(id)"
-        
+
+        // NOTE: If you need line items, prefer NetSuiteInvoiceRecord which models them fully.
         return Invoice(
-            id: id, // Use NetSuite ID directly for consistency
-            invoiceNumber: invoiceNumber,
-            customerId: customerId,
+            id: id,
+            invoiceNumber: number,
+            customerId: entity?.id ?? "",
             customerName: customerName,
-            amount: Decimal(validatedTotal),
-            balance: Decimal(validatedBalance),
-            status: invoiceStatus,
-            dueDate: dueDate,
-            createdDate: createdDate,
+            amount: Decimal(safeTotal),
+            balance: Decimal(safeRemain),
+            status: appStatus,
+            dueDate: due,
+            createdDate: created,
             netSuiteId: id,
-            items: items,
+            items: [],
             notes: memo?.trimmingCharacters(in: .whitespacesAndNewlines)
         )
     }
 }
 
-// MARK: - Error Handling Extensions
+// MARK: - List Item Models (Invoices / Customers / Payments)
 
-extension NetSuiteCustomerResponse {
-    /// Validates the customer response and returns any issues found
-    func validate() -> [String] {
-        var issues: [String] = []
-        
-        if id.isEmpty {
-            issues.append("Customer ID is empty")
-        }
-        
-        if [firstName, lastName, companyName].allSatisfy({ $0?.isEmpty != false }) {
-            issues.append("No customer name provided (firstName, lastName, or companyName)")
-        }
-        
-        if let email = email, !email.isEmpty {
-            // Basic email validation
-            let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-            if email.range(of: emailRegex, options: .regularExpression) == nil {
-                issues.append("Invalid email format: \(email)")
-            }
-        }
-        
-        return issues
-    }
-}
+public struct InvoiceItem: Codable {
+    public let links: [Link]
+    public let id: String
+    public let tranId: String?
+    public let entity: EntityReference?
+    public let amount: Double?
+    public let status: String?
+    public let trandate: String?
+    public let duedate: String?
 
-extension NetSuiteInvoiceResponse {
-    /// Validates the invoice response and returns any issues found
-    func validate() -> [String] {
-        var issues: [String] = []
-        
-        if id.isEmpty {
-            issues.append("Invoice ID is empty")
-        }
-        
-        if let total = total, total < 0 {
-            issues.append("Invoice total is negative: \(total)")
-        }
-        
-        if let amountRemaining = amountRemaining, amountRemaining < 0 {
-            issues.append("Invoice amount remaining is negative: \(amountRemaining)")
-        }
-        
-        // Note: Item validation is temporarily disabled since we changed the item structure
-        // TODO: Re-implement item validation when we have the correct item structure
-        
-        return issues
-    }
-} 
+    enum CodingKeys: String, CodingKey { case links, id, tranId, entity, amount, status, trandate, duedate }
 
-// MARK: - NetSuite Item Models
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        links = try c.decode([Link].self, forKey: .links)
+        id = try c.decode(String.self, forKey: .id)
+        tranId = try c.decodeIfPresent(String.self, forKey: .tranId)
+        entity = try c.decodeIfPresent(EntityReference.self, forKey: .entity)
+        amount = LooseNumber.double(c, .amount)
+        trandate = try c.decodeIfPresent(String.self, forKey: .trandate)
+        duedate = try c.decodeIfPresent(String.self, forKey: .duedate)
 
-/// Represents an item/product from NetSuite for invoice creation
-struct NetSuiteItem: Codable, Identifiable {
-    let id: String
-    let itemId: String
-    let displayName: String
-    let basePrice: Double
-    let description: String?
-    let itemType: String
-    
-    var formattedPrice: String {
-        return String(format: "$%.2f", basePrice)
+        // status can be a string or an object { id, refName }
+        if let s = try? c.decode(String.self, forKey: .status) {
+            status = s
+        } else if let o = try? c.decode(NetSuiteStatus.self, forKey: .status) {
+            status = o.refName ?? o.id
+        } else { status = nil }
     }
-    
-    var itemDescription: String {
-        return description?.isEmpty == false ? description! : displayName
-    }
-}
 
-// MARK: - Invoice List Response
-struct NetSuiteInvoiceListResponse: Codable {
-    let links: [Link]
-    let count: Int
-    let hasMore: Bool
-    let items: [InvoiceItem]
-    let offset: Int?
-    let totalResults: Int?
-}
+    public init(links: [Link], id: String, tranId: String?, entity: EntityReference?, amount: Double?, status: String?, trandate: String?, duedate: String?) {
+        self.links = links; self.id = id; self.tranId = tranId; self.entity = entity; self.amount = amount; self.status = status; self.trandate = trandate; self.duedate = duedate
+    }
 
-struct InvoiceItem: Codable {
-    let links: [Link]
-    let id: String
-    let tranId: String?
-    let entity: EntityReference?
-    let amount: Double?
-    let status: String?
-    let trandate: String?
-    let duedate: String?
-    
-    // Custom decoding to handle status field that can be either string or object
-    enum CodingKeys: String, CodingKey {
-        case links, id, tranId, entity, amount, status, trandate, duedate
+    /// Extract the last path component as the detail id
+    public var detailId: String {
+        if let selfLink = links.first(where: { $0.rel == "self" }), let url = URL(string: selfLink.href), let last = url.pathComponents.last { return last }
+        return id
     }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        links = try container.decode([Link].self, forKey: .links)
-        id = try container.decode(String.self, forKey: .id)
-        tranId = try container.decodeIfPresent(String.self, forKey: .tranId)
-        entity = try container.decodeIfPresent(EntityReference.self, forKey: .entity)
-        amount = try container.decodeIfPresent(Double.self, forKey: .amount)
-        trandate = try container.decodeIfPresent(String.self, forKey: .trandate)
-        duedate = try container.decodeIfPresent(String.self, forKey: .duedate)
-        
-        // Handle status field that can be either string or object
-        if let statusString = try? container.decode(String.self, forKey: .status) {
-            status = statusString
-        } else if let statusObject = try? container.decode(StatusObject.self, forKey: .status) {
-            status = statusObject.id
-        } else {
-            status = nil
-        }
-    }
-    
-    init(links: [Link], id: String, tranId: String?, entity: EntityReference?, amount: Double?, status: String?, trandate: String?, duedate: String?) {
-        self.links = links
-        self.id = id
-        self.tranId = tranId
-        self.entity = entity
-        self.amount = amount
-        self.status = status
-        self.trandate = trandate
-        self.duedate = duedate
-    }
-    
-    /// Extracts the UUID from the self link href for detail API calls
-    var detailId: String {
-        if let selfLink = links.first(where: { $0.rel == "self" }),
-           let url = URL(string: selfLink.href),
-           let lastPathComponent = url.pathComponents.last {
-            print("Debug: InvoiceItem - Extracted UUID from href: \(lastPathComponent) (original id: \(id))")
-            return lastPathComponent
-        }
-        print("Debug: InvoiceItem - Failed to extract UUID from href, using original id: \(id)")
-        return id // Fallback to simple id if href parsing fails
-    }
-    
+
     func toInvoice() -> Invoice {
-        // Validate and sanitize numeric values to prevent NaN
-        let safeAmount = Double(amount ?? 0.0)
-        let safeBalance = Double(amount ?? 0.0) // Using amount as balance for now
-        
-        let validatedAmount = safeAmount.isNaN || safeAmount.isInfinite ? 0.0 : safeAmount
-        let validatedBalance = safeBalance.isNaN || safeBalance.isInfinite ? 0.0 : safeBalance
-        
+        let safeAmount = (amount ?? 0).isFinite ? max(0, amount ?? 0) : 0
         return Invoice(
             id: detailId,
             invoiceNumber: tranId ?? "INV-\(detailId)",
             customerId: entity?.id ?? "",
             customerName: entity?.refName ?? "Customer \(id)",
-            amount: Decimal(validatedAmount),
-            balance: Decimal(validatedBalance),
-            dueDate: parseDate(duedate),
-            createdDate: parseDate(trandate) ?? Date(),
+            amount: Decimal(safeAmount),
+            balance: Decimal(safeAmount),
+            dueDate: NetSuiteDateParser.parseDate(duedate),
+            createdDate: NetSuiteDateParser.parseDate(trandate) ?? Date(),
             netSuiteId: detailId,
             items: []
         )
     }
-    
-    private func parseDate(_ dateString: String?) -> Date? {
-        guard let dateString = dateString else { return nil }
-        let formatter = ISO8601DateFormatter()
-        return formatter.date(from: dateString)
-    }
 }
 
-// MARK: - Customer List Response
-struct NetSuiteCustomerListResponse: Codable {
-    let links: [Link]
-    let count: Int
-    let hasMore: Bool
-    let items: [CustomerItem]
-    let offset: Int?
-    let totalResults: Int?
-}
+public struct CustomerItem: Codable {
+    public let links: [Link]
+    public let id: String
+    public let entityId: String?
+    public let companyName: String?
+    public let email: String?
+    public let phone: String?
+    public let isInactive: Bool?
 
-struct CustomerItem: Codable {
-    let links: [Link]
-    let id: String
-    let entityId: String?
-    let companyName: String?
-    let email: String?
-    let phone: String?
-    let isInactive: Bool?
-    
-    /// Extracts the UUID from the self link href for detail API calls
-    var detailId: String {
-        if let selfLink = links.first(where: { $0.rel == "self" }),
-           let url = URL(string: selfLink.href),
-           let lastPathComponent = url.pathComponents.last {
-            print("Debug: CustomerItem - Extracted UUID from href: \(lastPathComponent) (original id: \(id))")
-            return lastPathComponent
-        }
-        print("Debug: CustomerItem - Failed to extract UUID from href, using original id: \(id)")
-        return id // Fallback to simple id if href parsing fails
+    public var detailId: String {
+        if let selfLink = links.first(where: { $0.rel == "self" }), let url = URL(string: selfLink.href), let last = url.pathComponents.last { return last }
+        return id
     }
-    
+
     func toCustomer() -> Customer {
-        return Customer(
-            id: id, // Use the original id for consistency with NetSuite API
+        Customer(
+            id: id,
             name: companyName ?? entityId ?? "Customer \(id)",
             email: email,
             phone: phone,
@@ -712,994 +395,1768 @@ struct CustomerItem: Codable {
     }
 }
 
-// MARK: - Common Types
-struct Link: Codable {
-    let rel: String
-    let href: String
-}
+public struct PaymentItem: Codable {
+    public let links: [Link]
+    public let id: String
+    public let tranId: String?
+    public let entity: EntityReference?
+    public let amount: Double?
+    public let status: String?
+    public let trandate: String?
 
-// MARK: - Payment List Response
-struct NetSuitePaymentListResponse: Codable {
-    let links: [Link]
-    let count: Int
-    let hasMore: Bool
-    let items: [PaymentItem]
-    let offset: Int?
-    let totalResults: Int?
-}
+    enum CodingKeys: String, CodingKey { case links, id, tranId, entity, amount, status, trandate }
 
-struct PaymentItem: Codable {
-    let links: [Link]
-    let id: String
-    let tranId: String?
-    let entity: EntityReference?
-    let amount: Double?
-    let status: String?
-    let trandate: String?
-    
-    // Custom decoding to handle status field that can be either string or object
-    enum CodingKeys: String, CodingKey {
-        case links, id, tranId, entity, amount, status, trandate
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        links = try c.decode([Link].self, forKey: .links)
+        id = try c.decode(String.self, forKey: .id)
+        tranId = try c.decodeIfPresent(String.self, forKey: .tranId)
+        entity = try c.decodeIfPresent(EntityReference.self, forKey: .entity)
+        amount = LooseNumber.double(c, .amount)
+        trandate = try c.decodeIfPresent(String.self, forKey: .trandate)
+        if let s = try? c.decode(String.self, forKey: .status) { status = s }
+        else if let o = try? c.decode(NetSuiteStatus.self, forKey: .status) { status = o.refName ?? o.id }
+        else { status = nil }
     }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        links = try container.decode([Link].self, forKey: .links)
-        id = try container.decode(String.self, forKey: .id)
-        tranId = try container.decodeIfPresent(String.self, forKey: .tranId)
-        entity = try container.decodeIfPresent(EntityReference.self, forKey: .entity)
-        amount = try container.decodeIfPresent(Double.self, forKey: .amount)
-        trandate = try container.decodeIfPresent(String.self, forKey: .trandate)
-        
-        // Handle status field that can be either string or object
-        if let statusString = try? container.decode(String.self, forKey: .status) {
-            status = statusString
-        } else if let statusObject = try? container.decode(StatusObject.self, forKey: .status) {
-            status = statusObject.id
-        } else {
-            status = nil
-        }
+
+    public init(links: [Link], id: String, tranId: String?, entity: EntityReference?, amount: Double?, status: String?, trandate: String?) {
+        self.links = links; self.id = id; self.tranId = tranId; self.entity = entity; self.amount = amount; self.status = status; self.trandate = trandate
     }
-    
-    init(links: [Link], id: String, tranId: String?, entity: EntityReference?, amount: Double?, status: String?, trandate: String?) {
-        self.links = links
-        self.id = id
-        self.tranId = tranId
-        self.entity = entity
-        self.amount = amount
-        self.status = status
-        self.trandate = trandate
+
+    public var detailId: String {
+        if let selfLink = links.first(where: { $0.rel == "self" }), let url = URL(string: selfLink.href), let last = url.pathComponents.last { return last }
+        return id
     }
-    
-    /// Extracts the UUID from the self link href for detail API calls
-    var detailId: String {
-        if let selfLink = links.first(where: { $0.rel == "self" }),
-           let url = URL(string: selfLink.href),
-           let lastPathComponent = url.pathComponents.last {
-            print("Debug: PaymentItem - Extracted UUID from href: \(lastPathComponent) (original id: \(id))")
-            return lastPathComponent
-        }
-        print("Debug: PaymentItem - Failed to extract UUID from href, using original id: \(id)")
-        return id // Fallback to simple id if href parsing fails
-    }
-    
+
     func toPayment() -> Payment {
-        return Payment(
-            id: detailId, // Use the UUID from href for consistency
-            amount: Decimal(amount ?? 0.0),
-            status: Payment.PaymentStatus(rawValue: status ?? "pending") ?? .pending,
+        Payment(
+            id: detailId,
+            amount: Decimal((amount ?? 0).isFinite ? max(0, amount ?? 0) : 0),
+            status: PaymentStatus(rawValue: status ?? "pending") ?? .pending,
             paymentMethod: .cash,
             customerId: entity?.id,
             invoiceId: nil,
             description: "Payment from NetSuite",
             netSuitePaymentId: detailId,
-            createdDate: parseDate(trandate) ?? Date()
+            createdDate: NetSuiteDateParser.parseDate(trandate) ?? Date()
         )
     }
-    
-    private func parseDate(_ dateString: String?) -> Date? {
-        guard let dateString = dateString else { return nil }
-        let formatter = ISO8601DateFormatter()
-        return formatter.date(from: dateString)
-    }
-} 
-
-// MARK: - SuiteQL Response Models
-
-struct SuiteQLResponse: Codable {
-    let links: [Link]
-    let count: Int
-    let hasMore: Bool
-    let items: [SuiteQLItem]
-    let offset: Int?
-    let totalResults: Int?
 }
 
-struct SuiteQLItem: Codable {
-    let values: [String: String]
-    
-    // Direct properties from NetSuite response
-    let id: String?
-    let tranid: String?
-    let trandate: String?
-    let amount: String?
-    let status: String?
-    let memo: String?
-    let paymentmethod: String?
-    let entity: String?
-    let type: String?
-    let links: [Link]?
+// MARK: - Transaction (mixed types)
+
+public struct TransactionItem: Codable {
+    public let links: [Link]
+    public let id: String
+    public let tranId: String?
+    public let trandate: String?
+    public let amount: Double?
+    public let type: String?
+    public let status: String?
+    public let memo: String?
+
+    enum CodingKeys: String, CodingKey { case links, id, tranId, trandate, amount, type, status, memo }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        links = try c.decode([Link].self, forKey: .links)
+        id = try c.decode(String.self, forKey: .id)
+        tranId = try c.decodeIfPresent(String.self, forKey: .tranId)
+        trandate = try c.decodeIfPresent(String.self, forKey: .trandate)
+        amount = LooseNumber.double(c, .amount)
+        type = try c.decodeIfPresent(String.self, forKey: .type)
+        memo = try c.decodeIfPresent(String.self, forKey: .memo)
+        if let s = try? c.decode(String.self, forKey: .status) { status = s }
+        else if let o = try? c.decode(NetSuiteStatus.self, forKey: .status) { status = o.refName ?? o.id }
+        else { status = nil }
+    }
+
+    public func toTransaction() -> CustomerTransaction {
+        CustomerTransaction(
+            id: id,
+            transactionNumber: tranId ?? "TXN-\(id)",
+            date: NetSuiteDateParser.parseDate(trandate) ?? Date(),
+            amount: Decimal((amount ?? 0).isFinite ? max(0, amount ?? 0) : 0),
+            type: type ?? "Unknown",
+            status: status ?? "Unknown",
+            memo: memo
+        )
+    }
+}
+
+// MARK: - SuiteQL
+
+public struct SuiteQLResponse: Codable {
+    public let count: Int
+    public let hasMore: Bool
+    public let items: [SuiteQLItem]
+    public let offset: Int
+    public let totalResults: Int
+}
+
+// MARK: - Date Range Invoice Response
+public struct DateRangeInvoiceResponse: Codable {
+    public let count: Int
+    public let hasMore: Bool
+    public let items: [DateRangeInvoiceItem]
+    public let offset: Int
+    public let totalResults: Int
+}
+
+public struct DateRangeInvoiceItem: Codable {
+    public let invoice: String
+    public let invoiceNumber: String
+    public let invoiceDate: String
+    public let customer: String
+    public let customerName: String
+    public let customerPONumber: String?
+    public let salesOrder: String?
+    public let soNumber: String?
+    public let salesRep: String?
+    public let salesRepName: String?
+    public let totalAmount: Double?
+    public let status: String
+    public let balanceDue: Double?
+    public let dueDate: String?
     
     enum CodingKeys: String, CodingKey {
-        case id, tranid, trandate, amount, status, memo, paymentmethod, entity, type, links
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        // Decode direct properties
-        self.id = try container.decodeIfPresent(String.self, forKey: .id)
-        self.tranid = try container.decodeIfPresent(String.self, forKey: .tranid)
-        self.trandate = try container.decodeIfPresent(String.self, forKey: .trandate)
-        self.amount = try container.decodeIfPresent(String.self, forKey: .amount)
-        self.memo = try container.decodeIfPresent(String.self, forKey: .memo)
-        self.paymentmethod = try container.decodeIfPresent(String.self, forKey: .paymentmethod)
-        self.entity = try container.decodeIfPresent(String.self, forKey: .entity)
-        self.type = try container.decodeIfPresent(String.self, forKey: .type)
-        self.links = try container.decodeIfPresent([Link].self, forKey: .links) ?? []
-        
-        // Handle status field that can be either string or object
-        if let statusString = try? container.decode(String.self, forKey: .status) {
-            self.status = statusString
-        } else if let statusObject = try? container.decode(StatusObject.self, forKey: .status) {
-            self.status = statusObject.id
-        } else {
-            self.status = nil
-        }
-        
-        // Create values dictionary for backward compatibility
-        var dict: [String: String] = [:]
-        if let id = id { dict["id"] = id }
-        if let tranid = tranid { dict["tranid"] = tranid }
-        if let trandate = trandate { dict["trandate"] = trandate }
-        if let amount = amount { dict["amount"] = amount }
-        if let status = status { dict["status"] = status }
-        if let memo = memo { dict["memo"] = memo }
-        if let paymentmethod = paymentmethod { dict["paymentmethod"] = paymentmethod }
-        if let entity = entity { dict["entity"] = entity }
-        if let type = type { dict["type"] = type }
-        
-        self.values = dict
+        case invoice = "Invoice"
+        case invoiceNumber = "InvoiceNumber"
+        case invoiceDate = "InvoiceDate"
+        case customer = "Customer"
+        case customerName = "CustomerName"
+        case customerPONumber = "CustomerPONumber"
+        case salesOrder = "SalesOrder"
+        case soNumber = "SONumber"
+        case salesRep = "SalesRep"
+        case salesRepName = "SalesRepName"
+        case totalAmount = "TotalAmount"
+        case status = "Status"
+        case balanceDue = "BalanceDue"
+        case dueDate = "DueDate"
     }
 }
 
-// MARK: - SuiteQL Query Builder
+// MARK: - Display Value Models (using BUILTIN.DF)
 
-enum SuiteQLQuery {
-    case customerTransactionHistory(customerId: String)
-    case customerPaymentHistory(customerId: String)
-    case customerInvoiceHistory(customerId: String)
-    case custom(String)
+/// Transaction with display values from BUILTIN.DF
+public struct NetSuiteTransactionWithDisplay: Codable, Identifiable {
+    public let id: String
+    public let tranId: String
+    public let trandate: Date
+    public let amount: Double
+    public let type: String
+    public let status: String
+    public let customerName: String
+    public let memo: String?
     
-    var query: String {
-        switch self {
-        case .customerTransactionHistory(let customerId):
-            return """
-            SELECT 
-                t.id,
-                t.tranid,
-                t.trandate,
-                t.amount,
-                t.type,
-                t.status,
-                t.memo
-            FROM transaction t
-            WHERE t.entity = '\(customerId)'
-            ORDER BY t.trandate DESC
-            """
-            
-        case .customerPaymentHistory(let customerId):
-            return """
-            SELECT 
-                t.id,
-                t.tranid,
-                t.trandate,
-                t.payment,
-                t.status,
-                t.memo,
-                t.paymentmethod
-            FROM transaction t
-            WHERE t.entity = '\(customerId)' AND t.type = 'CustPymt'
-            ORDER BY t.trandate DESC
-            """
-            
-        case .customerInvoiceHistory(let customerId):
-            return """
-            SELECT 
-                t.id,
-                t.tranid,
-                t.trandate,
-                t.amount,
-                t.status,
-                t.memo,
-                t.entity
-            FROM transaction t
-            WHERE t.entity = '\(customerId)' AND t.type = 'Invoice'
-            ORDER BY t.trandate DESC
-            """
-            
-        case .custom(let query):
-            return query
-        }
-    }
-}
-
-// MARK: - Customer Transaction Models
-
-struct CustomerTransactionResponse: Codable {
-    let links: [Link]
-    let count: Int
-    let hasMore: Bool
-    let items: [TransactionItem]
-    let offset: Int?
-    let totalResults: Int?
-}
-
-struct TransactionItem: Codable {
-    let links: [Link]
-    let id: String
-    let tranId: String?
-    let trandate: String?
-    let amount: Double?
-    let type: String?
-    let status: String?
-    let memo: String?
-    
-    // Custom decoding to handle status field that can be either string or object
-    enum CodingKeys: String, CodingKey {
-        case links, id, tranId, trandate, amount, type, status, memo
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        links = try container.decode([Link].self, forKey: .links)
-        id = try container.decode(String.self, forKey: .id)
-        tranId = try container.decodeIfPresent(String.self, forKey: .tranId)
-        trandate = try container.decodeIfPresent(String.self, forKey: .trandate)
-        amount = try container.decodeIfPresent(Double.self, forKey: .amount)
-        type = try container.decodeIfPresent(String.self, forKey: .type)
-        memo = try container.decodeIfPresent(String.self, forKey: .memo)
-        
-        // Handle status field that can be either string or object
-        if let statusString = try? container.decode(String.self, forKey: .status) {
-            status = statusString
-        } else if let statusObject = try? container.decode(StatusObject.self, forKey: .status) {
-            status = statusObject.id
-        } else {
-            status = nil
-        }
-    }
-    
-    init(links: [Link], id: String, tranId: String?, trandate: String?, amount: Double?, type: String?, status: String?, memo: String?) {
-        self.links = links
+    public init(id: String, tranId: String, trandate: Date, amount: Double, type: String, status: String, customerName: String, memo: String?) {
         self.id = id
         self.tranId = tranId
         self.trandate = trandate
         self.amount = amount
         self.type = type
         self.status = status
+        self.customerName = customerName
         self.memo = memo
     }
-    
-    func toTransaction() -> CustomerTransaction {
-        return CustomerTransaction(
-            id: id,
-            transactionNumber: tranId ?? "TXN-\(id)",
-            date: parseDate(trandate) ?? Date(),
-            amount: Decimal(amount ?? 0.0),
-            type: type ?? "Unknown",
-            status: status ?? "Unknown",
-            memo: memo
-        )
-    }
-    
-    private func parseDate(_ dateString: String?) -> Date? {
-        guard let dateString = dateString else { return nil }
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-        
-        if let date = formatter.date(from: dateString) {
-            return date
-        }
-        
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-        if let date = formatter.date(from: dateString) {
-            return date
-        }
-        
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: dateString)
-    }
 }
 
-// MARK: - Customer Payment Models
-
-struct CustomerPaymentResponse: Codable {
-    let links: [Link]
-    let count: Int
-    let hasMore: Bool
-    let items: [CustomerPaymentItem]
-    let offset: Int?
-    let totalResults: Int?
-}
-
-struct CustomerPaymentItem: Codable {
-    let links: [Link]
-    let id: String
-    let tranId: String?
-    let trandate: String?
-    let amount: Double?
-    let status: String?
-    let memo: String?
-    let paymentMethod: String?
+/// Invoice with display values from BUILTIN.DF
+public struct NetSuiteInvoiceWithDisplay: Codable, Identifiable {
+    public let id: String
+    public let tranId: String
+    public let trandate: Date
+    public let total: Double
+    public let status: String
+    public let customerName: String
+    public let memo: String?
     
-    // Custom decoding to handle status field that can be either string or object
-    enum CodingKeys: String, CodingKey {
-        case links, id, tranId, trandate, amount, status, memo, paymentMethod
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        links = try container.decode([Link].self, forKey: .links)
-        id = try container.decode(String.self, forKey: .id)
-        tranId = try container.decodeIfPresent(String.self, forKey: .tranId)
-        trandate = try container.decodeIfPresent(String.self, forKey: .trandate)
-        amount = try container.decodeIfPresent(Double.self, forKey: .amount)
-        memo = try container.decodeIfPresent(String.self, forKey: .memo)
-        paymentMethod = try container.decodeIfPresent(String.self, forKey: .paymentMethod)
-        
-        // Handle status field that can be either string or object
-        if let statusString = try? container.decode(String.self, forKey: .status) {
-            status = statusString
-        } else if let statusObject = try? container.decode(StatusObject.self, forKey: .status) {
-            status = statusObject.id
-        } else {
-            status = nil
-        }
-    }
-    
-    init(links: [Link], id: String, tranId: String?, trandate: String?, amount: Double?, status: String?, memo: String?, paymentMethod: String?) {
-        self.links = links
+    public init(id: String, tranId: String, trandate: Date, total: Double, status: String, customerName: String, memo: String?) {
         self.id = id
         self.tranId = tranId
         self.trandate = trandate
-        self.amount = amount
+        self.total = total
         self.status = status
+        self.customerName = customerName
         self.memo = memo
-        self.paymentMethod = paymentMethod
-    }
-    
-    func toPayment() -> CustomerPayment {
-        return CustomerPayment(
-            id: id,
-            paymentNumber: tranId ?? "PAY-\(id)",
-            date: parseDate(trandate) ?? Date(),
-            amount: Decimal(amount ?? 0.0),
-            status: status ?? "Unknown",
-            memo: memo,
-            paymentMethod: paymentMethod
-        )
-    }
-    
-    private func parseDate(_ dateString: String?) -> Date? {
-        guard let dateString = dateString else { return nil }
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-        
-        if let date = formatter.date(from: dateString) {
-            return date
-        }
-        
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-        if let date = formatter.date(from: dateString) {
-            return date
-        }
-        
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: dateString)
     }
 }
 
-// MARK: - Customer Transaction and Payment Models
-
-struct CustomerTransaction: Identifiable, Codable {
-    let id: String
-    let transactionNumber: String
-    let date: Date
-    let amount: Decimal
-    let type: String
-    let status: String
-    let memo: String?
+/// Payment with display values from BUILTIN.DF
+public struct NetSuitePaymentWithDisplay: Codable, Identifiable {
+    public let id: String
+    public let tranId: String
+    public let trandate: Date
+    public let total: Double
+    public let status: String
+    public let customerName: String
+    public let memo: String?
     
-    var formattedAmount: String {
-        // Validate the amount to prevent NaN errors
-        if amount.isNaN || amount.isInfinite {
-            return "$0.00"
-        }
-        
-        // Handle extremely large numbers
-        if amount > Decimal(1_000_000_000) {
-            return "$0.00"
-        }
-        
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        formatter.maximumFractionDigits = 2
-        formatter.minimumFractionDigits = 2
-        return formatter.string(from: amount as NSDecimalNumber) ?? "$0.00"
-    }
-    
-    var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
+    public init(id: String, tranId: String, trandate: Date, total: Double, status: String, customerName: String, memo: String?) {
+        self.id = id
+        self.tranId = tranId
+        self.trandate = trandate
+        self.total = total
+        self.status = status
+        self.customerName = customerName
+        self.memo = memo
     }
 }
 
-struct CustomerPayment: Identifiable, Codable {
-    let id: String
-    let paymentNumber: String
-    let date: Date
-    let amount: Decimal
-    let status: String
-    let memo: String?
-    let paymentMethod: String?
+/// Sales Order with display values from BUILTIN.DF
+public struct NetSuiteSalesOrderWithDisplay: Codable, Identifiable {
+    public let id: String
+    public let tranId: String
+    public let trandate: Date
+    public let status: String
+    public let customerName: String
+    public let memo: String?
     
-    var formattedAmount: String {
-        // Validate the amount to prevent NaN errors
-        if amount.isNaN || amount.isInfinite {
-            return "$0.00"
-        }
+    public init(id: String, tranId: String, trandate: Date, status: String, customerName: String, memo: String?) {
+        self.id = id
+        self.tranId = tranId
+        self.trandate = trandate
+        self.status = status
+        self.customerName = customerName
+        self.memo = memo
+    }
+}
+
+public struct SuiteQLItem: Codable {
+    public let values: [String: String]
+
+    // Direct fields (best-effort when present)
+    public let id: String?
+    public let tranid: String?
+    public let trandate: String?
+    public let amount: String?
+    public let status: String?
+    public let memo: String?
+    public let paymentmethod: String?
+    public let entity: String?
+    public let type: String?
+    public let links: [Link]?
+
+    enum CodingKeys: String, CodingKey { case id, tranid, trandate, amount, status, memo, paymentmethod, entity, type, links }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id)
+        tranid = try c.decodeIfPresent(String.self, forKey: .tranid)
+        trandate = try c.decodeIfPresent(String.self, forKey: .trandate)
+        amount = try c.decodeIfPresent(String.self, forKey: .amount)
+        memo = try c.decodeIfPresent(String.self, forKey: .memo)
+        paymentmethod = try c.decodeIfPresent(String.self, forKey: .paymentmethod)
+        entity = try c.decodeIfPresent(String.self, forKey: .entity)
+        type = try c.decodeIfPresent(String.self, forKey: .type)
+        links = try c.decodeIfPresent([Link].self, forKey: .links) ?? []
+
+        // status may be string or object; try string first
+        if let s = try? c.decode(String.self, forKey: .status) {
+            status = s
+        } else if let o = try? c.decode(NetSuiteStatus.self, forKey: .status) {
+            status = o.refName ?? o.id
+        } else { status = nil }
+
+        var dict: [String: String] = [:]
+        if let id = id { dict["id"] = id }
+        if let t = tranid { dict["tranid"] = t }
+        if let d = trandate { dict["trandate"] = d }
+        if let a = amount { dict["amount"] = a }
+        if let s = status { dict["status"] = s }
+        if let m = memo { dict["memo"] = m }
+        if let pm = paymentmethod { dict["paymentmethod"] = pm }
+        if let e = entity { dict["entity"] = e }
+        if let ty = type { dict["type"] = ty }
+        values = dict
+    }
+}
+
+public enum SuiteQLQuery {
+    case customerTransactionHistory(customerId: String)
+    case customerPaymentHistory(customerId: String)
+    case customerInvoiceHistory(customerId: String)
+    case paymentsWithDateFilter(fromDate: String)
+    case paymentsWithDateFilterAndCustomer(fromDate: String, customerId: String)
+    case customerTransactions(customerId: String)
+    case customerPayments(customerId: String)
+    case customerInvoices(customerId: String)
+    case salesOrders
+    case customerSalesOrders(customerId: String)
+    case salesOrder(id: String)
+    case customers
+    case allCustomers
+    case invoices
+    case allInvoices
+    case inventoryItems(limit: Int)
+    case locations(limit: Int)
+    case custom(String)
+    case invoicesWithStatusFilter(statusFilter: String)
+    case paymentsWithStatusFilter(statusFilter: String)
+    case transactionsWithStatusFilter(statusFilter: String)
+    case transactionsWithDisplayValues
+    case invoicesWithDisplayValues
+    case paymentsWithDisplayValues
+    case salesOrdersWithDisplayValues
+    case itemsWithDisplayValues
+    case transactionsWithItemDisplayValues
+    case transactionsWithLocationDisplayValues
+    case testSalesOrderTypes
+    case testAllSalesOrders
+    case customerInvoicesByDateRange(fromDate: String, toDate: String?)
+    case invoicesWithLineItems(customerId: String?)
+    case comprehensivePayments
+    case customerDeposits(customerId: String)
+    case allCustomerDeposits
+    case allCustomerPayments
+    case depositsWithDateFilter(fromDate: String)
+    case salesOrderLineItems(salesOrderId: String)
+    case salesOrderWithPaymentInfo(customerId: String)
+    case salesOrderWithDeposits(customerId: String)
+    case salesOrderWithLineItems(customerId: String)
+    case salesOrdersComprehensive(customerId: String)
+
+    public var query: String {
+        switch self {
+        case .customerTransactionHistory(let cid):
+            let id = Self.sanitize(cid)
+            return """
+            SELECT 
+                t.id, 
+                t.tranid, 
+                t.trandate, 
+                t.foreigntotal as total, 
+                t.type, 
+                t.status, 
+                t.memo,
+                c.companyname as customer_name,
+                t.otherrefnum as customer_po
+            FROM transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            WHERE c.id = '\(id)'
+            AND t.type IN ('CustPymt', 'CustInvc', 'CustCred', 'SOrd')
+            ORDER BY t.trandate DESC
+            """
+        case .customerPaymentHistory(let cid):
+            let id = Self.sanitize(cid)
+            return """
+            SELECT 
+                t.id AS Transaction,
+                t.tranid AS TranID,
+                t.trandate AS TranDate,
+                t.entity AS CustomerID,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS ForeignTotal,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS Memo,
+                t.voided AS Voided,
+                t.otherrefnum AS OtherRefNum
+            FROM 
+                transaction t
+                INNER JOIN customer c ON t.entity = c.id
+            WHERE 
+                t.entity = '\(id)' 
+                AND t.type = 'CustPymt'
+                AND t.voided = 'F'
+            ORDER BY 
+                t.tranid DESC
+            """
+                case .customerInvoiceHistory(let cid):
+            let id = Self.sanitize(cid)
+            return """
+            SELECT 
+                t.id AS InvoiceID,
+                t.tranid AS InvoiceNumber,
+                t.trandate AS InvoiceDate,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS TotalAmount,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS InvoiceMemo,
+                tl.linesequencenumber AS LineNumber,
+                tl.quantity AS Quantity,
+                tl.rate AS Rate,
+                (tl.quantity * tl.rate) AS LineAmount,
+                tl.memo AS LineMemo,
+                tl.item AS ItemID
+            FROM 
+                transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE 
+                t.type = 'CustInvc'
+                AND t.entity = \(id)
+                AND ( RowNum <= 20 )
+            ORDER BY 
+                t.id, tl.linesequencenumber
+            """
+        case .paymentsWithDateFilter(let fromDate):
+            return """
+            SELECT
+                t.id AS Transaction,
+                t.tranid AS TranID,
+                t.trandate AS TranDate,
+                t.entity AS CustomerID,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS ForeignTotal,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS Memo,
+                t.voided AS Voided,
+                t.otherrefnum AS OtherRefNum
+            FROM
+                transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            WHERE
+                t.type = 'CustPymt'
+                AND t.trandate >= '\(fromDate)'
+                AND t.voided = 'F'
+            ORDER BY
+                t.trandate DESC
+            """
+        case .paymentsWithDateFilterAndCustomer(let fromDate, let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT
+                t.id AS Transaction,
+                t.tranid AS TranID,
+                t.trandate AS TranDate,
+                t.entity AS CustomerID,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS ForeignTotal,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS Memo,
+                t.voided AS Voided,
+                t.otherrefnum AS OtherRefNum
+            FROM
+                transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            WHERE
+                t.type = 'CustPymt'
+                AND t.trandate >= '\(fromDate)'
+                AND t.entity = '\(id)'
+                AND t.voided = 'F'
+            ORDER BY
+                t.tranid DESC
+            """
         
-        // Handle extremely large numbers
-        if amount > Decimal(1_000_000_000) {
-            return "$0.00"
-        }
+        case .comprehensivePayments:
+            return """
+            SELECT
+                t.id AS Transaction,
+                t.tranid AS TranID,
+                t.trandate AS TranDate,
+                t.entity AS CustomerID,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS ForeignTotal,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS Memo,
+                t.voided AS Voided,
+                t.otherrefnum AS OtherRefNum
+            FROM
+                transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            WHERE
+                t.type = 'CustPymt'
+                AND t.voided = 'F'
+
+            ORDER BY
+                t.tranid DESC
+            """
         
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        formatter.maximumFractionDigits = 2
-        formatter.minimumFractionDigits = 2
-        return formatter.string(from: amount as NSDecimalNumber) ?? "$0.00"
-    }
-    
-    var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
-    }
-} 
+        case .customerDeposits(let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT
+                t.id AS Transaction,
+                t.tranid AS TranID,
+                t.trandate AS TranDate,
+                t.entity AS CustomerID,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS ForeignTotal,
+                t.paymentmethod AS PaymentMethodID,
+                BUILTIN.DF(t.paymentmethod) AS PaymentMethodName,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.voided AS Voided
+            FROM 
+                transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            WHERE 
+                t.type = 'CustDep' 
+                AND t.entity = '\(id)'
+                AND t.voided = 'F'
+            ORDER BY
+                t.trandate DESC
+            """
+        
+        case .allCustomerDeposits:
+            return """
+            SELECT
+                t.id AS Transaction,
+                t.tranid AS TranID,
+                t.trandate AS TranDate,
+                BUILTIN.DF(t.entity) AS Customer,
+                t.foreigntotal AS ForeignTotal,
+                BUILTIN.DF(t.paymentmethod) AS PaymentMethod,
+                t.otherrefnum AS OtherRefNum,
+                BUILTIN.DF(t.status) AS Status
+            FROM
+                transaction t
+            WHERE
+                t.type = 'CustDep'
+                AND t.voided = 'F'
+            ORDER BY
+                t.tranid DESC
+            LIMIT 100
+            """
+        
+        case .allCustomerPayments:
+            return """
+            SELECT
+                t.id AS Transaction,
+                t.tranid AS TranID,
+                t.trandate AS TranDate,
+                t.entity AS CustomerID,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS ForeignTotal,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS Memo,
+                t.voided AS Voided,
+                t.otherrefnum AS OtherRefNum
+            FROM
+                transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            WHERE
+                t.type = 'CustPymt'
+                AND t.voided = 'F'
 
-// MARK: - Helper Functions
+            ORDER BY
+                t.trandate DESC
+            """
+        
+        case .depositsWithDateFilter(let fromDate):
+            return """
+            SELECT
+                t.id AS Transaction,
+                t.tranid AS TranID,
+                t.trandate AS TranDate,
+                BUILTIN.DF(t.entity) AS Customer,
+                t.foreigntotal AS ForeignTotal,
+                BUILTIN.DF(t.paymentmethod) AS PaymentMethod,
+                BUILTIN.DF(t.status) AS Status
+            FROM
+                Transaction t
+            WHERE
+                t.type = 'CustDep'
+                AND t.trandate >= '\(fromDate)'
+            ORDER BY
+                t.trandate DESC
+            LIMIT 100
+            """
+        
+        case .inventoryItems(_):
+            return """
+            SELECT i.id, i.itemid, i.displayname, i.description, i.isinactive, i.itemtype
+            FROM item i
+            WHERE i.itemtype IN ('InvtPart', 'NonInvtPart', 'Service')
+            ORDER BY i.displayname
+            """
+        case .locations(let limit):
+            return """
+            SELECT l.id, l.name, l.isinactive
+            FROM location l
+            ORDER BY l.name
+            LIMIT \(limit)
+            """
+        case .customerTransactions(let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT t.id, t.total, t.trandate
+            FROM transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            WHERE c.id = '\(id)' AND t.type IN ('CustPymt', 'CustInvc', 'CustCred')
+            ORDER BY t.trandate DESC
+            """
+        case .customerPayments(let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT
+                t.id AS Transaction,
+                t.tranid AS TranID,
+                t.trandate AS TranDate,
+                t.entity AS CustomerID,
+                BUILTIN.DF(t.entity) AS CustomerName,
+                t.foreigntotal AS ForeignTotal,
+                t.status AS StatusDisplay,
+                t.memo AS Memo
+            FROM
+                Transaction t
+            WHERE
+                t.type = 'CustPymt'
+                AND t.entity = '\(id)'
+            ORDER BY
+                t.trandate DESC
+            """
+        case .customerInvoices(let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT 
+                t.id AS InvoiceID,
+                t.tranid AS InvoiceNumber,
+                t.trandate AS InvoiceDate,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS TotalAmount,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS InvoiceMemo,
+                tl.linesequencenumber AS LineNumber,
+                tl.quantity AS Quantity,
+                tl.rate AS Rate,
+                (tl.quantity * tl.rate) AS LineAmount,
+                tl.memo AS LineMemo,
+                tl.item AS ItemID
+            FROM 
+                transaction t
+                INNER JOIN customer c ON t.entity = c.id
+                INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE 
+                t.entity = '\(id)' 
+                AND t.type = 'CustInvc'
+                AND t.voided = 'F'
+                AND ( RowNum <= 20 )
+            ORDER BY 
+                t.id, tl.linesequencenumber
+            """
+        case .salesOrders:
+            return """
+            SELECT 
+                id, 
+                tranid, 
+                trandate, 
+                status,
+                BUILTIN.DF(status) AS StatusName,
+                entity,
+                BUILTIN.DF(entity) AS CustomerName,
+                memo,
+                otherrefnum,
+                foreigntotal,
+                duedate,
+                createddate,
+                lastmodifieddate
+            FROM Transaction
+            WHERE Type = 'SalesOrd'
+            ORDER BY trandate DESC
+            """
+        case .customerSalesOrders(let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT 
+                s.id, 
+                s.tranid, 
+                s.trandate, 
+                s.status,
+                BUILTIN.DF(s.status) AS StatusName,
+                s.entity,
+                BUILTIN.DF(s.entity) AS CustomerName,
+                s.foreigntotal AS total,
+                s.memo,
+                s.otherrefnum,
+                s.duedate,
+                s.createddate,
+                s.lastmodifieddate
+            FROM Transaction s
+            WHERE s.Type = 'SalesOrd' AND s.entity = '\(id)'
+            ORDER BY s.trandate DESC
+            """
+        case .salesOrder(let id):
+            let sanitizedId = Self.sanitize(id)
+            return """
+            SELECT 
+                s.id, 
+                s.tranid, 
+                s.trandate, 
+                s.status,
+                BUILTIN.DF(s.status) AS StatusName,
+                s.entity,
+                BUILTIN.DF(s.entity) AS CustomerName,
+                s.foreigntotal,
+                s.memo,
+                s.otherrefnum,
+                s.duedate,
+                s.createddate,
+                s.lastmodifieddate
+            FROM Transaction s
+            WHERE s.Type = 'SalesOrd' AND s.id = '\(sanitizedId)'
+            """
+        case .salesOrderLineItems(let salesOrderId):
+            let sanitizedId = Self.sanitize(salesOrderId)
+            return """
+            SELECT
+                tl.transaction AS SalesOrderID,
+                tl.item AS ItemID,
+                BUILTIN.DF(tl.item) AS ItemName,
+                tl.rate AS UnitPrice,
+                tl.quantity AS Quantity,
+                tl.netamount AS LineAmount,
+                tl.memo AS LineMemo
+            FROM 
+                TransactionLine tl
+            WHERE 
+                tl.transaction = '\(sanitizedId)'
+            ORDER BY
+                tl.id
+            """
+        case .salesOrderWithPaymentInfo(let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT
+                t.id,
+                t.tranid,
+                t.trandate,
+                t.status,
+                BUILTIN.DF(t.status) AS StatusName,
+                t.entity,
+                BUILTIN.DF(t.entity) AS CustomerName,
+                t.foreigntotal AS OrderTotal,
+                t.amountunbilled,
+                t.foreignamountpaid,
+                t.foreignamountunpaid,
+                t.paymenthold,
+                t.paymentmethod,
+                BUILTIN.DF(t.paymentmethod) AS PaymentMethodName
+            FROM 
+                Transaction t
+            WHERE 
+                t.Type = 'SalesOrd' AND t.entity = '\(id)'
+            ORDER BY
+                t.trandate DESC
+            """
+        case .salesOrderWithDeposits(let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT
+                so.id AS SalesOrderID,
+                so.tranid AS OrderNumber,
+                so.trandate AS OrderDate,
+                so.status AS OrderStatus,
+                BUILTIN.DF(so.status) AS OrderStatusName,
+                so.entity AS CustomerID,
+                BUILTIN.DF(so.entity) AS CustomerName,
+                so.foreigntotal AS OrderTotal,
+                so.amountunbilled,
+                so.paymentmethod AS OrderPaymentMethod,
+                BUILTIN.DF(so.paymentmethod) AS OrderPaymentMethodName,
+                so.memo AS PONumber,
+                d.id AS DepositID,
+                d.tranid AS DepositNumber,
+                d.trandate AS DepositDate,
+                d.foreigntotal AS DepositAmount,
+                d.paymentmethod AS DepositPaymentMethod,
+                BUILTIN.DF(d.paymentmethod) AS DepositPaymentMethodName,
+                d.status AS DepositStatus,
+                BUILTIN.DF(d.status) AS DepositStatusName
+            FROM 
+                Transaction so
+            LEFT JOIN Transaction d ON d.entity = so.entity AND d.type = 'CustDep'
+            WHERE 
+                so.Type = 'SalesOrd' AND so.entity = '\(id)'
+            ORDER BY
+                so.trandate DESC, d.trandate DESC
+            """
+        case .salesOrderWithLineItems(let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT
+                t.id AS sales_order_id,
+                t.tranid AS order_number,
+                t.trandate AS order_date,
+                t.duedate AS due_date,
+                t.foreigntotal AS order_total,
+                t.memo AS po_number,
+                t.otherrefnum AS customer_po,
+                t.status AS status_id,
+                BUILTIN.DF(t.status) AS status_display,
+                t.entity AS customer_id,
+                c.companyname AS customer_name,
+                c.email AS customer_email,
+                c.phone AS customer_phone,
+                t.createdby AS created_by_id,
+                BUILTIN.DF(t.createdby) AS created_by_name,
+                t.lastmodifiedby AS modified_by_id,
+                BUILTIN.DF(t.lastmodifiedby) AS modified_by_name,
+                t.paymentmethod AS payment_method_id,
+                BUILTIN.DF(t.paymentmethod) AS payment_method_name,
+                t.amountunbilled AS amount_unbilled,
+                t.foreignamountpaid AS amount_paid,
+                t.foreignamountunpaid AS amount_unpaid,
+                t.paymenthold AS payment_hold,
+                t.createddate AS created_date,
+                t.lastmodifieddate AS last_modified_date,
+                tl.id AS line_item_id,
+                tl.linesequencenumber AS line_sequence,
+                tl.item AS item_id,
+                BUILTIN.DF(tl.item) AS item_name,
+                tl.quantity AS quantity,
+                tl.rate AS unit_price,
+                tl.netamount AS line_amount,
+                tl.memo AS line_memo
+            FROM Transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE t.Type = 'SalesOrd'
+            AND t.voided = 'F'
+            AND t.entity = '\(id)'
+            ORDER BY t.trandate DESC, tl.linesequencenumber
+            """
+        case .salesOrdersComprehensive(let customerId):
+            let id = Self.sanitize(customerId)
+            return """
+            SELECT 
+                -- Sales Order Header Information
+                t.id AS sales_order_id,
+                t.tranid AS order_number,
+                t.trandate AS order_date,
+                t.duedate AS due_date,
+                t.foreigntotal AS order_total,
+                t.memo AS po_number,
+                t.otherrefnum AS customer_po,
+                
+                -- Status Information
+                t.status AS status_id,
+                BUILTIN.DF(t.status) AS status_display,
+                
+                -- Customer Information
+                t.entity AS customer_id,
+                c.companyname AS customer_name,
+                c.email AS customer_email,
+                c.phone AS customer_phone,
+                
+                -- Staff Member Information
+                t.createdby AS created_by_id,
+                BUILTIN.DF(t.createdby) AS created_by_name,
+                t.lastmodifiedby AS modified_by_id,
+                BUILTIN.DF(t.lastmodifiedby) AS modified_by_name,
+                
+                -- Payment Information
+                t.paymentmethod AS payment_method_id,
+                BUILTIN.DF(t.paymentmethod) AS payment_method_name,
+                t.amountunbilled AS amount_unbilled,
+                t.foreignamountpaid AS amount_paid,
+                t.foreignamountunpaid AS amount_unpaid,
+                t.paymenthold AS payment_hold,
+                
+                -- Dates
+                t.createddate AS created_date,
+                t.lastmodifieddate AS last_modified_date,
+                
+                -- Line Item Information (All Confirmed Working Fields)
+                tl.id AS line_item_id,
+                tl.linesequencenumber AS line_sequence,
+                tl.item AS item_id,
+                BUILTIN.DF(tl.item) AS item_name,
+                tl.quantity AS quantity,
+                tl.rate AS unit_price,
+                tl.netamount AS line_amount,
+                tl.memo AS line_memo
+                
+            FROM Transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE t.Type = 'SalesOrd'
+            AND t.voided = 'F'
+            AND t.entity = '\(id)'
+            ORDER BY t.trandate DESC, tl.linesequencenumber
+            """
 
-func parseDate(_ dateString: String?) -> Date? {
-    guard let dateString = dateString else { return nil }
-    
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-    
-    if let date = formatter.date(from: dateString) {
-        return date
+        case .customers:
+            return """
+            SELECT c.id, c.entityid, c.companyname, c.email, c.phone, c.isinactive
+            FROM customer c
+            ORDER BY c.companyname
+            LIMIT 100
+            """
+        case .allCustomers:
+            return """
+            SELECT c.id, c.entityid, c.companyname, c.email, c.phone, c.isinactive
+            FROM customer c
+            ORDER BY c.companyname
+            """
+        case .invoices:
+            return """
+            SELECT 
+                t.id AS InvoiceID,
+                t.tranid AS InvoiceNumber,
+                t.trandate AS InvoiceDate,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS TotalAmount,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS InvoiceMemo,
+                tl.linesequencenumber AS LineNumber,
+                tl.quantity AS Quantity,
+                tl.rate AS Rate,
+                (tl.quantity * tl.rate) AS LineAmount,
+                tl.memo AS LineMemo,
+                tl.item AS ItemID
+            FROM 
+                transaction t
+                INNER JOIN customer c ON t.entity = c.id
+                INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE 
+                t.type = 'CustInvc'
+                AND t.voided = 'F'
+                AND ( RowNum <= 20 )
+            ORDER BY 
+                t.id, tl.linesequencenumber
+            """
+        case .allInvoices:
+            return """
+            SELECT 
+                t.id AS InvoiceID,
+                t.tranid AS InvoiceNumber,
+                t.trandate AS InvoiceDate,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS TotalAmount,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS InvoiceMemo,
+                tl.linesequencenumber AS LineNumber,
+                tl.quantity AS Quantity,
+                tl.rate AS Rate,
+                (tl.quantity * tl.rate) AS LineAmount,
+                tl.memo AS LineMemo,
+                tl.item AS ItemID
+            FROM 
+                transaction t
+                INNER JOIN customer c ON t.entity = c.id
+                INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE 
+                t.type = 'CustInvc'
+                AND ( RowNum <= 20 )
+            ORDER BY 
+                t.id, tl.linesequencenumber
+            """
+        case .custom(let q):
+            return q
+        case .testSalesOrderTypes:
+            return """
+            SELECT DISTINCT type, COUNT(*) as count
+            FROM transaction
+            WHERE type LIKE '%Ord%' OR type LIKE '%SO%'
+            GROUP BY type
+            ORDER BY count DESC
+            """
+        case .testAllSalesOrders:
+            return """
+            SELECT id, tranid, trandate, entity, type
+            FROM transaction
+            WHERE type = 'SOrd'
+            ORDER BY trandate DESC
+            LIMIT 10
+            """
+        case .customerInvoicesByDateRange(let fromDate, let toDate):
+            let sanitizedFromDate = Self.sanitize(fromDate)
+            let dateFilter: String
+            if let toDate = toDate, !toDate.isEmpty {
+                let sanitizedToDate = Self.sanitize(toDate)
+                dateFilter = "AND ( transaction.trandate >= '\(sanitizedFromDate)' AND transaction.trandate <= '\(sanitizedToDate)' )"
+            } else {
+                // Use relative date range if no toDate specified
+                dateFilter = "AND ( transaction.trandate >= BUILTIN.RELATIVE_RANGES( 'DAGO30', 'START' ) )"
+            }
+            
+            return """
+            SELECT
+                t.id AS InvoiceID,			
+                t.tranid AS InvoiceNumber,	
+                t.trandate AS InvoiceDate,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS TotalAmount,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS InvoiceMemo,
+                tl.linesequencenumber AS LineNumber,
+                tl.quantity AS Quantity,
+                tl.rate AS Rate,
+                (tl.quantity * tl.rate) AS LineAmount,
+                tl.memo AS LineMemo,
+                tl.item AS ItemID
+            FROM
+                transaction t		
+                INNER JOIN customer c ON t.entity = c.id
+                INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE
+                t.type = 'CustInvc'
+                \(dateFilter)
+                AND t.voided = 'F'
+                AND ( RowNum <= 20 )
+            ORDER BY			
+                t.id, tl.linesequencenumber
+            """
+        case .invoicesWithLineItems(let customerId):
+            let customerFilter = customerId.map { "AND t.entity = '\(Self.sanitize($0))'" } ?? ""
+            return """
+            SELECT 
+                t.id AS InvoiceID,
+                t.tranid AS InvoiceNumber,
+                t.trandate AS InvoiceDate,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS TotalAmount,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS InvoiceMemo,
+                tl.linesequencenumber AS LineNumber,
+                tl.quantity AS Quantity,
+                tl.rate AS Rate,
+                (tl.quantity * tl.rate) AS LineAmount,
+                tl.memo AS LineMemo,
+                tl.item AS ItemID
+            FROM 
+                transaction t
+                INNER JOIN customer c ON t.entity = c.id
+                INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE 
+                t.type = 'CustInvc'
+                \(customerFilter)
+                AND t.voided = 'F'
+                AND ( RowNum <= 20 )
+            ORDER BY 
+                t.id, tl.linesequencenumber
+            """
+        case .invoicesWithStatusFilter(let statusFilter):
+            let sanitizedFilter = Self.sanitize(statusFilter)
+            return """
+            SELECT 
+                t.id AS InvoiceID,
+                t.tranid AS InvoiceNumber,
+                t.trandate AS InvoiceDate,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS TotalAmount,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS InvoiceMemo,
+                tl.linesequencenumber AS LineNumber,
+                tl.quantity AS Quantity,
+                tl.rate AS Rate,
+                (tl.quantity * tl.rate) AS LineAmount,
+                tl.memo AS LineMemo,
+                tl.item AS ItemID
+            FROM 
+                transaction t
+                INNER JOIN customer c ON t.entity = c.id
+                INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE 
+                t.type = 'CustInvc' 
+                AND t.status = '\(sanitizedFilter)'
+                AND t.voided = 'F'
+                AND ( RowNum <= 20 )
+            ORDER BY 
+                t.id, tl.linesequencenumber
+            """
+        case .paymentsWithStatusFilter(let statusFilter):
+            let sanitizedFilter = Self.sanitize(statusFilter)
+            return """
+            SELECT 
+                t.id, 
+                t.tranid, 
+                t.trandate, 
+                t.foreigntotal as total, 
+                t.entity as entity, 
+                t.status, 
+                t.memo,
+                c.companyname as customer_name,
+                t.checknum as check_number,
+                t.applied as amount_applied,
+                t.unapplied as amount_unapplied,
+                t.paymentmethod as payment_method_id,
+                pm.name as payment_method_name,
+                l.name as location_name,
+                d.name as department_name,
+                cl.name as class_name,
+                t.voided,
+                t.tobeemailed,
+                t.tobeprinted
+            FROM transaction t
+            INNER JOIN customer c ON t.customer = c.id
+            LEFT JOIN paymentmethod pm ON t.paymentmethod = pm.id
+            LEFT JOIN location l ON t.location = l.id
+            LEFT JOIN department d ON t.department = d.id
+            LEFT JOIN classification cl ON t.class = cl.id
+            WHERE t.type = 'CustPymt' AND t.status = '\(sanitizedFilter)'
+            ORDER BY t.trandate DESC
+            """
+        case .transactionsWithStatusFilter(let statusFilter):
+            let sanitizedFilter = Self.sanitize(statusFilter)
+            return """
+            SELECT 
+                t.id, 
+                t.tranid, 
+                t.trandate, 
+                t.totalaftertaxes as total, 
+                t.type, 
+                t.entity, 
+                t.status, 
+                t.memo,
+                c.companyname as customer_name,
+                t.otherrefnum as customer_po,
+
+            FROM transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            WHERE t.status = '\(sanitizedFilter)'
+            ORDER BY t.trandate DESC
+            """
+        case .transactionsWithDisplayValues:
+            return """
+            SELECT 
+                t.id, 
+                t.tranid, 
+                t.trandate, 
+                t.foreigntotal as total, 
+                t.type, 
+                t.status,
+                c.companyname as customer_name,
+                t.memo,
+                t.otherrefnum as customer_po
+            FROM transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            ORDER BY t.trandate DESC
+            LIMIT 100
+            """
+        case .invoicesWithDisplayValues:
+            return """
+            SELECT 
+                t.id AS InvoiceID,
+                t.tranid AS InvoiceNumber,
+                t.trandate AS InvoiceDate,
+                c.companyname AS CustomerName,
+                t.foreigntotal AS TotalAmount,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                t.memo AS InvoiceMemo,
+                tl.linesequencenumber AS LineNumber,
+                tl.quantity AS Quantity,
+                tl.rate AS Rate,
+                (tl.quantity * tl.rate) AS LineAmount,
+                tl.memo AS LineMemo,
+                tl.item AS ItemID
+            FROM 
+                transaction t
+                INNER JOIN customer c ON t.entity = c.id
+                INNER JOIN transactionline tl ON t.id = tl.transaction
+            WHERE 
+                t.type = 'CustInvc'
+                AND t.voided = 'F'
+                AND ( RowNum <= 20 )
+            ORDER BY 
+                t.id, tl.linesequencenumber
+            """
+        case .paymentsWithDisplayValues:
+            return """
+            SELECT 
+                t.id, 
+                t.tranid, 
+                t.trandate, 
+                t.foreigntotal as total, 
+                BUILTIN.DF(t.status) as status,
+                c.companyname as customer_name,
+                t.memo,
+                t.checknum as check_number,
+                t.applied as amount_applied,
+                t.unapplied as amount_unapplied,
+                t.paymentmethod as payment_method_id,
+                pm.name as payment_method_name,
+                l.name as location_name,
+                d.name as department_name,
+                cl.name as class_name,
+                t.voided,
+                t.tobeemailed,
+                t.tobeprinted
+            FROM transaction t
+            INNER JOIN customer c ON t.entity = c.id
+            LEFT JOIN paymentmethod pm ON t.paymentmethod = pm.id
+            WHERE t.type = 'CustPymt'
+            AND t.voided = 'F'
+            ORDER BY t.trandate DESC
+            LIMIT 100
+            """
+        case .salesOrdersWithDisplayValues:
+            return """
+            SELECT 
+                s.id, 
+                s.tranid, 
+                s.trandate, 
+                s.status,
+                c.companyname as customer_name,
+                s.memo,
+                s.otherrefnum as customer_po,
+                s.foreigntotal as total
+            FROM transaction s
+            INNER JOIN customer c ON s.entity = c.id
+            WHERE s.type = 'SOrd'
+            ORDER BY s.trandate DESC
+            LIMIT 100
+            """
+        case .itemsWithDisplayValues:
+            return """
+            SELECT 
+                i.id, 
+                i.itemid, 
+                i.displayname, 
+                i.description, 
+                i.isinactive, 
+                i.itemtype
+            FROM item i
+            ORDER BY i.displayname
+            LIMIT 100
+            """
+        case .transactionsWithItemDisplayValues:
+            return """
+            SELECT 
+                t.id, 
+                t.tranid, 
+                t.trandate, 
+                t.total, 
+                t.type, 
+                BUILTIN.CF(t.status) as status,
+                BUILTIN.DF(t.entity) as item_name,
+                t.memo
+            FROM transaction t
+            WHERE t.type IN ('CustInvc', 'CustCred')
+            ORDER BY t.trandate DESC
+            LIMIT 100
+            """
+        case .transactionsWithLocationDisplayValues:
+            return """
+            SELECT 
+                t.id, 
+                t.tranid, 
+                t.trandate, 
+                t.total, 
+                t.type, 
+                BUILTIN.CF(t.status) as status,
+                BUILTIN.DF(t.entity) as location_name,
+                t.memo
+            FROM transaction t
+            WHERE t.type = 'SOrd'
+            ORDER BY t.trandate DESC
+            LIMIT 100
+            """
+        }
     }
-    
-    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-    if let date = formatter.date(from: dateString) {
-        return date
+
+    private static func sanitize(_ s: String) -> String { s.replacingOccurrences(of: "'", with: "''") }
+}
+
+// MARK: - To-domain models (kept as in your project)
+
+public struct CustomerTransaction: Identifiable, Codable {
+    public let id: String
+    public let transactionNumber: String
+    public let date: Date
+    public let amount: Decimal
+    public let type: String
+    public let status: String
+    public let memo: String?
+
+    public var formattedAmount: String {
+        if amount.isNaN || amount.isInfinite || amount > Decimal(1_000_000_000) { return "$0.00" }
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: amount as NSDecimalNumber) ?? "$0.00"
     }
-    
-    formatter.dateFormat = "yyyy-MM-dd"
-    return formatter.date(from: dateString)
-} 
+    public var formattedDate: String { let f = DateFormatter(); f.dateStyle = .medium; return f.string(from: date) }
+}
 
-// MARK: - NetSuite Customer Payment Record Models
+public struct CustomerPayment: Identifiable, Codable {
+    public let id: String
+    public let paymentNumber: String
+    public let date: Date
+    public let amount: Decimal
+    public let status: String
+    public let memo: String?
+    public let paymentMethod: String?
 
-struct NetSuiteCustomerPaymentRecord: Codable {
-    let id: String?
-    let tranId: String?
-    let entity: EntityReference?
-    let amount: Double
-    let status: String
-    let trandate: String
-    let memo: String?
-    let paymentMethod: String?
-    let applied: [AppliedPayment]?
-    
+    public var formattedAmount: String {
+        if amount.isNaN || amount.isInfinite || amount > Decimal(1_000_000_000) { return "$0.00" }
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: amount as NSDecimalNumber) ?? "$0.00"
+    }
+    public var formattedDate: String { let f = DateFormatter(); f.dateStyle = .medium; return f.string(from: date) }
+}
+
+// MARK: - NetSuite Items (for invoice creation UI)
+
+public struct NetSuiteItem: Codable, Identifiable {
+    public let id: String
+    public let itemId: String
+    public let displayName: String
+    public let basePrice: Double
+    public let description: String?
+    public let itemType: String
+
+    public var formattedPrice: String { String(format: "$%.2f", basePrice) }
+    public var itemDescription: String { (description?.isEmpty == false ? description! : displayName) }
+}
+
+// MARK: - Invoice Creation models
+
+public struct NetSuiteInvoiceTemplate: Codable, Identifiable {
+    public let id: String
+    public let name: String?
+    public let isInactive: Bool
+    public let customForm: EntityReference
+    public let subsidiary: EntityReference?
+    public let requiredFields: [String]?
+}
+
+public struct NetSuiteLocation: Codable, Identifiable {
+    public let id: String
+    public let name: String
+    public let isInactive: Bool
+    public let subsidiary: EntityReference?
+    public let address: NetSuiteAddress?
+}
+
+public struct NetSuiteLocationReference: Codable { public let id: String; public let refName: String?; public let type: String? }
+
+public struct NetSuiteCustomerPaymentRecord: Codable {
+    public let entity: EntityReference
+    public let amount: Double
+    public let paymentMethod: EntityReference
+    public let memo: String?
+    public let tranDate: String?
+    public let subsidiary: EntityReference?
+    public let location: EntityReference?
+    public let currency: EntityReference?
+    public let exchangeRate: Double?
+    public let customFieldList: NetSuiteCustomFieldList?
+
     init(payment: Payment) {
-        self.id = nil // NetSuite will assign the ID
-        self.tranId = nil // NetSuite will assign the transaction ID
-        self.entity = payment.customerId != nil ? EntityReference(id: payment.customerId!, refName: nil, type: "CUSTOMER") : nil
-        self.amount = (payment.amount as NSDecimalNumber).doubleValue
-        self.status = payment.status.rawValue
-        self.trandate = ISO8601DateFormatter().string(from: payment.createdDate)
+        self.entity = EntityReference(id: payment.customerId, refName: nil, type: nil)
+        self.amount = NSDecimalNumber(decimal: payment.amount).doubleValue
+        self.paymentMethod = EntityReference(id: "1", refName: "Cash", type: nil) // default
         self.memo = payment.description
-        self.paymentMethod = mapPaymentMethodToNetSuite(payment.paymentMethod)
-        self.applied = payment.invoiceId != nil ? [AppliedPayment(invoiceId: payment.invoiceId!, amount: payment.amount)] : nil
+        self.tranDate = ISO8601DateFormatter().string(from: payment.createdDate)
+        self.subsidiary = nil
+        self.location = nil
+        self.currency = EntityReference(id: "1", refName: "USD", type: nil) // default
+        self.exchangeRate = 1.0
+        self.customFieldList = nil
     }
 }
 
-struct AppliedPayment: Codable {
-    let doc: String
-    let amount: Double
-    let apply: Bool
-    
-    init(invoiceId: String, amount: Decimal) {
-        self.doc = invoiceId
-        self.amount = (amount as NSDecimalNumber).doubleValue
-        self.apply = true
-    }
-}
+public struct NetSuiteCustomerPaymentResponse: Codable {
+    public let id: String
+    public let tranId: String?
+    public let entity: EntityReference?
+    public let amount: Double?
+    public let paymentMethod: EntityReference?
+    public let memo: String?
+    public let tranDate: String?
+    public let status: NetSuiteStatus?
+    public let createdDate: String?
+    public let lastModifiedDate: String?
 
-struct NetSuiteCustomerPaymentResponse: Codable {
-    let links: [Link]
-    let id: String
-    let tranId: String?
-    let entity: EntityReference?
-    let amount: Double?
-    let status: String?
-    let trandate: String?
-    let memo: String?
-    let paymentMethod: String?
-    
-    // Custom decoding to handle status field that can be either string or object
-    enum CodingKeys: String, CodingKey {
-        case links, id, tranId, entity, amount, status, trandate, memo, paymentMethod
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        links = try container.decode([Link].self, forKey: .links)
-        id = try container.decode(String.self, forKey: .id)
-        tranId = try container.decodeIfPresent(String.self, forKey: .tranId)
-        entity = try container.decodeIfPresent(EntityReference.self, forKey: .entity)
-        amount = try container.decodeIfPresent(Double.self, forKey: .amount)
-        trandate = try container.decodeIfPresent(String.self, forKey: .trandate)
-        memo = try container.decodeIfPresent(String.self, forKey: .memo)
-        paymentMethod = try container.decodeIfPresent(String.self, forKey: .paymentMethod)
-        
-        // Handle status field that can be either string or object
-        if let statusString = try? container.decode(String.self, forKey: .status) {
-            status = statusString
-        } else if let statusObject = try? container.decode(StatusObject.self, forKey: .status) {
-            status = statusObject.id
-        } else {
-            status = nil
-        }
-    }
-    
-    init(links: [Link], id: String, tranId: String?, entity: EntityReference?, amount: Double?, status: String?, trandate: String?, memo: String?, paymentMethod: String?) {
-        self.links = links
-        self.id = id
-        self.tranId = tranId
-        self.entity = entity
-        self.amount = amount
-        self.status = status
-        self.trandate = trandate
-        self.memo = memo
-        self.paymentMethod = paymentMethod
-    }
-    
     func toPayment() -> Payment {
-        return Payment(
+        Payment(
             id: id,
-            amount: Decimal(amount ?? 0.0),
-            status: Payment.PaymentStatus(rawValue: status ?? "pending") ?? .pending,
-            paymentMethod: mapNetSuitePaymentMethodToApp(paymentMethod ?? ""),
+            amount: Decimal((amount ?? 0).isFinite ? max(0, amount ?? 0) : 0),
+            paymentMethod: .cash,
             customerId: entity?.id,
             invoiceId: nil,
             description: memo,
             netSuitePaymentId: id,
-            createdDate: parseDate(trandate) ?? Date()
+            createdDate: NetSuiteDateParser.parseDate(tranDate) ?? Date()
         )
     }
+}
+
+public struct NetSuiteCustomerPaymentListResponse: Codable {
+    public let items: [NetSuiteCustomerPaymentResponse]
+    public let hasMore: Bool?
+    public let offset: Int?
+    public let count: Int?
+}
+
+public struct NetSuiteInvoiceCreationRequest: Codable {
+    public let entity: EntityReference
+    public let tranDate: String
+    public let memo: String?
+    public let itemList: NetSuiteInvoiceItemList
+    public let customForm: EntityReference?
+    public let location: NetSuiteLocationReference?
+    public let subsidiary: EntityReference?
+    public let terms: EntityReference?
+    public let currency: EntityReference?
+    public let exchangeRate: Double?
+    public let customFieldList: NetSuiteCustomFieldList?
+
+    public init(
+        entity: EntityReference,
+        tranDate: String,
+        memo: String?,
+        itemList: NetSuiteInvoiceItemList,
+        customForm: EntityReference? = nil,
+        location: NetSuiteLocationReference? = nil,
+        subsidiary: EntityReference? = nil,
+        terms: EntityReference? = nil,
+        currency: EntityReference? = nil,
+        exchangeRate: Double? = 1.0,
+        customFieldList: NetSuiteCustomFieldList? = nil
+    ) {
+        self.entity = entity
+        self.tranDate = tranDate
+        self.memo = memo
+        self.itemList = itemList
+        self.customForm = customForm
+        self.location = location
+        self.subsidiary = subsidiary
+        self.terms = terms
+        self.currency = currency
+        self.exchangeRate = exchangeRate
+        self.customFieldList = customFieldList
+    }
     
-    private func parseDate(_ dateString: String?) -> Date? {
-        guard let dateString = dateString else { return nil }
-        let formatter = ISO8601DateFormatter()
-        return formatter.date(from: dateString)
+    func toDictionary() -> [String: Any] {
+        var dict: [String: Any] = [
+            "entity": [
+                "id": entity.id,
+                "refName": entity.refName,
+                "type": entity.type
+            ],
+            "tranDate": tranDate,
+            "itemList": [
+                "item": itemList.item.map { item in
+                    [
+                        "item": [
+                            "id": item.item.id,
+                            "refName": item.item.refName,
+                            "type": item.item.type
+                        ],
+                        "quantity": item.quantity,
+                        "rate": item.rate,
+                        "amount": item.amount,
+                        "description": item.description as Any,
+                        "lineNumber": item.lineNumber as Any
+                    ]
+                }
+            ]
+        ]
+        
+        if let memo = memo {
+            dict["memo"] = memo
+        }
+        
+        if let customForm = customForm {
+            dict["customForm"] = [
+                "id": customForm.id,
+                "refName": customForm.refName,
+                "type": customForm.type
+            ]
+        }
+        
+        if let location = location {
+            dict["location"] = [
+                "id": location.id,
+                "refName": location.refName,
+                "type": location.type
+            ]
+        }
+        
+        if let subsidiary = subsidiary {
+            dict["subsidiary"] = [
+                "id": subsidiary.id,
+                "refName": subsidiary.refName,
+                "type": subsidiary.type
+            ]
+        }
+        
+        if let terms = terms {
+            dict["terms"] = [
+                "id": terms.id,
+                "refName": terms.refName,
+                "type": terms.type
+            ]
+        }
+        
+        if let currency = currency {
+            dict["currency"] = [
+                "id": currency.id,
+                "refName": currency.refName,
+                "type": currency.type
+            ]
+        }
+        
+        if let exchangeRate = exchangeRate {
+            dict["exchangeRate"] = exchangeRate
+        }
+        
+        return dict
     }
 }
 
+public struct NetSuiteInvoiceItemList: Codable { public let item: [NetSuiteInvoiceLineItem] }
 
-
-// MARK: - Payment Method Mapping Functions
-
-func mapPaymentMethodToNetSuite(_ method: Payment.PaymentMethod) -> String {
-    switch method {
-    case .tapToPay, .manualCard, .applePay, .googlePay:
-        return "CREDIT_CARD"
-    case .cash:
-        return "CASH"
-    case .check:
-        return "CHECK"
-    case .bankTransfer:
-        return "BANK_TRANSFER"
-    case .windcaveTapToPay:
-        return "CREDIT_CARD"
-    }
+public struct NetSuiteInvoiceLineItem: Codable {
+    public let item: EntityReference
+    public let quantity: Double
+    public let rate: Double
+    public let amount: Double
+    public let description: String?
+    public let lineNumber: Int?
 }
 
-func mapNetSuitePaymentMethodToApp(_ method: String) -> Payment.PaymentMethod {
-    switch method.uppercased() {
-    case "CREDIT_CARD":
-        return .tapToPay
-    case "CASH":
-        return .cash
-    case "CHECK":
-        return .check
-    case "BANK_TRANSFER":
-        return .bankTransfer
-    default:
-        return .tapToPay
-    }
-} 
+public struct NetSuiteCustomFieldList: Codable { }
 
-// MARK: - Inventory and Invoice Creation Models
+// MARK: - NetSuite Types
 
-// MARK: - Inventory Item Models
-struct NetSuiteInventoryItem: Codable {
+struct NetSuiteTransaction: Codable, Identifiable {
     let id: String
-    let itemId: String?
-    let displayName: String?
-    let description: String?
-    let basePrice: Double?
-    let isInactive: Bool?
-    let itemType: String?
-    let location: NetSuiteLocationReference?
-    let subsidiary: NetSuiteEntityReference?
-    let customFieldList: [String: String]?
-    
-    enum CodingKeys: String, CodingKey {
-        case id = "id"
-        case itemId = "itemId"
-        case displayName = "displayName"
-        case description = "description"
-        case basePrice = "basePrice"
-        case isInactive = "isInactive"
-        case itemType = "itemType"
-        case location = "location"
-        case subsidiary = "subsidiary"
-        case customFieldList = "customFieldList"
-    }
-}
-
-struct NetSuiteInventoryItemListResponse: Codable {
-    let links: [NetSuiteLink]?
-    let count: Int?
-    let hasMore: Bool?
-    let offset: Int?
-    let totalResults: Int?
-    let items: [NetSuiteInventoryItem]
-}
-
-// MARK: - Invoice Template Models
-struct NetSuiteInvoiceTemplate: Codable {
-    let id: String
-    let name: String?
-    let isInactive: Bool?
-    let customForm: NetSuiteEntityReference?
-    let subsidiary: NetSuiteEntityReference?
-    let requiredFields: [String]?
-    
-    enum CodingKeys: String, CodingKey {
-        case id = "id"
-        case name = "name"
-        case isInactive = "isInactive"
-        case customForm = "customForm"
-        case subsidiary = "subsidiary"
-        case requiredFields = "requiredFields"
-    }
-}
-
-struct NetSuiteInvoiceTemplateListResponse: Codable {
-    let links: [NetSuiteLink]?
-    let count: Int?
-    let hasMore: Bool?
-    let offset: Int?
-    let totalResults: Int?
-    let items: [NetSuiteInvoiceTemplate]
-}
-
-// MARK: - Location Models
-struct NetSuiteLocation: Codable {
-    let id: String
-    let name: String?
-    let isInactive: Bool?
-    let subsidiary: NetSuiteEntityReference?
-    let address: NetSuiteAddress?
-    
-    enum CodingKeys: String, CodingKey {
-        case id = "id"
-        case name = "name"
-        case isInactive = "isInactive"
-        case subsidiary = "subsidiary"
-        case address = "address"
-    }
-}
-
-struct NetSuiteLocationReference: Codable {
-    let id: String?
-    let refName: String?
-    let type: String?
-}
-
-struct NetSuiteLocationListResponse: Codable {
-    let links: [NetSuiteLink]?
-    let count: Int?
-    let hasMore: Bool?
-    let offset: Int?
-    let totalResults: Int?
-    let items: [NetSuiteLocation]
-}
-
-// MARK: - Invoice Line Item Models
-struct NetSuiteInvoiceLineItem: Codable {
-    let item: NetSuiteInventoryItem?
-    let quantity: Double?
-    let rate: Double?
-    let amount: Double?
-    let description: String?
-    let lineNumber: Int?
-    
-    enum CodingKeys: String, CodingKey {
-        case item = "item"
-        case quantity = "quantity"
-        case rate = "rate"
-        case amount = "amount"
-        case description = "description"
-        case lineNumber = "lineNumber"
-    }
-}
-
-// MARK: - Invoice Creation Request Models
-struct NetSuiteInvoiceCreationRequest: Codable {
-    let entity: NetSuiteEntityReference
-    let tranDate: String?
-    let dueDate: String?
+    let amount: Double
+    let date: Date
+    let customerId: String
+    let type: String
+    let status: String
     let memo: String?
-    let customForm: NetSuiteEntityReference?
-    let location: NetSuiteLocationReference?
-    let subsidiary: NetSuiteEntityReference?
-    let item: [NetSuiteInvoiceLineItem]?
     
-    enum CodingKeys: String, CodingKey {
-        case entity = "entity"
-        case tranDate = "tranDate"
-        case dueDate = "dueDate"
-        case memo = "memo"
-        case customForm = "customForm"
-        case location = "location"
-        case subsidiary = "subsidiary"
-        case item = "item"
-    }
-}
-
-// MARK: - Conversion Extensions
-extension NetSuiteInventoryItem {
-    func toInvoiceItem() -> Invoice.InvoiceItem {
-        return Invoice.InvoiceItem(
+    func toCustomerTransaction() -> CustomerTransaction {
+        return CustomerTransaction(
             id: id,
-            description: description ?? displayName ?? "Unknown Item",
-            quantity: 1.0,
-            unitPrice: Decimal(basePrice ?? 0.0),
-            amount: Decimal(basePrice ?? 0.0),
-            netSuiteItemId: itemId
+            transactionNumber: id,
+            date: date,
+            amount: Decimal(amount),
+            type: type,
+            status: status,
+            memo: memo
         )
     }
 }
 
-// MARK: - SuiteQL Queries for Invoice Creation
-extension SuiteQLQuery {
-    static func inventoryItems(limit: Int = 100) -> SuiteQLQuery {
-        return .custom("""
-            SELECT 
-                id,
-                itemid,
-                displayname,
-                description,
-                isinactive,
-                itemtype
-            FROM item 
-            WHERE isinactive = 'F' AND itemtype IN ('InvtPart', 'NonInvtPart', 'Service')
-            ORDER BY displayname
-            """)
-    }
-    
-    // IMPORTANT: Form records are NOT queryable via SuiteQL in NetSuite
-    // SuiteQL is limited to transaction tables, entity records (customer, item, employee), etc.
-    // UI-level constructs like "forms" are not part of the SuiteQL data model.
-    //
-    // Alternatives for getting invoice forms:
-    // 1. Use REST Record Service: /services/rest/record/v1/customform
-    // 2. Use static configuration in your app if forms don't change often
-    // 3. Create a custom record in NetSuite that lists form names/IDs and query that
-    // 4. Query actual invoice records to see what forms are being used in practice
-    static func invoiceTemplates(limit: Int = 50) -> SuiteQLQuery {
-        // This query will intentionally fail - form table is not supported in SuiteQL
-        // Kept for reference but should use REST Record API instead
-        return .custom("""
-            -- This query is NOT supported in SuiteQL and will fail
-            -- Use REST Record API /services/rest/record/v1/customform instead
-            SELECT 
-                id,
-                name,
-                isinactive
-            FROM customform 
-            WHERE recordtype = 'invoice' AND isinactive = 'F'
-            ORDER BY name
-            """)
-    }
-    
-    static func locations(limit: Int = 50) -> SuiteQLQuery {
-        return .custom("""
-            SELECT 
-                id,
-                name,
-                isinactive
-            FROM location 
-            WHERE isinactive = 'F'
-            ORDER BY name
-            """)
-    }
-} 
-
-// MARK: - SuiteQL-Specific Models for Customer Data
-
-// Generic SuiteQL Response wrapper for new models (matches feedback structure)
-struct SuiteQLGenericResponse<T: Codable>: Codable {
-    let count: Int
-    let hasMore: Bool?
-    let items: [T]
-}
-
-// SuiteQL Invoice Record for customer-specific queries
-struct SuiteQLInvoiceRecord: Codable, Identifiable {
+struct NetSuiteCustomer: Codable, Identifiable {
     let id: String
-    let tranid: String
-    let trandate: String
-    let status: String?
-    let memo: String?
-    let entity: EntityRef?
+    let name: String
+}
+
+struct NetSuiteInvoice: Codable, Identifiable {
+    let id: String
+    let amount: Double
+}
+
+struct NetSuiteTemplate: Codable, Identifiable {
+    let id: String
+    let name: String
+}
+
+// MARK: - NetSuite Errors
+enum NetSuiteError: Error, LocalizedError {
+    case notConfigured
+    case requestFailed
+    case invalidResponse
+    case authenticationFailed
+    case rateLimited
     
-    struct EntityRef: Codable {
-        let id: String
-        let refName: String?
-    }
-    
-    enum CodingKeys: String, CodingKey {
-        case id, tranid, trandate, status, memo, entity
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        self.id = try container.decode(String.self, forKey: .id)
-        self.tranid = try container.decode(String.self, forKey: .tranid)
-        self.trandate = try container.decode(String.self, forKey: .trandate)
-        self.memo = try container.decodeIfPresent(String.self, forKey: .memo)
-        
-        // Handle entity field that can be either string or object
-        if let entityString = try? container.decode(String.self, forKey: .entity) {
-            self.entity = EntityRef(id: entityString, refName: nil)
-        } else if let entityObject = try? container.decode(EntityRef.self, forKey: .entity) {
-            self.entity = entityObject
-        } else {
-            self.entity = nil
+    var errorDescription: String? {
+        switch self {
+        case .notConfigured:
+            return "NetSuite is not configured. Please set account ID and tokens."
+        case .requestFailed:
+            return "NetSuite API request failed."
+        case .invalidResponse:
+            return "Invalid response from NetSuite API."
+        case .authenticationFailed:
+            return "NetSuite authentication failed."
+        case .rateLimited:
+            return "NetSuite API rate limit exceeded."
         }
-        
-        // Handle status field that can be either string or object
-        if let statusString = try? container.decode(String.self, forKey: .status) {
-            self.status = statusString
-        } else if let statusObject = try? container.decode(StatusObject.self, forKey: .status) {
-            self.status = statusObject.refName
-        } else {
-            self.status = nil
-        }
-    }
-    
-    // Helper struct for when status is an object
-    private struct StatusObject: Codable {
-        let refName: String
-    }
-    
-    // Convert to our app's Invoice model
-    func toInvoice() -> Invoice {
-        return Invoice(
-            id: id,
-            invoiceNumber: tranid,
-            customerId: entity?.id ?? "",
-            customerName: entity?.refName ?? "Unknown Customer",
-            amount: Decimal(0), // SuiteQL doesn't provide amount
-            balance: Decimal(0), // SuiteQL doesn't provide balance
-            status: Invoice.InvoiceStatus(rawValue: status ?? "pending") ?? .pending,
-            dueDate: NetSuiteDateParser.parseDate(trandate), // SuiteQL doesn't provide dueDate
-            createdDate: NetSuiteDateParser.parseDate(trandate) ?? Date(),
-            netSuiteId: id,
-            items: [],
-            notes: memo
-        )
     }
 }
 
-// SuiteQL Payment Record for customer-specific queries
-struct SuiteQLPaymentRecord: Codable, Identifiable {
-    let id: String
-    let tranid: String
-    let trandate: String
-    let status: String?
-    let memo: String?
-    let entity: EntityRef?
-    let paymentmethod: String?
+// MARK: - Customer Data Model for Batch Operations
+
+struct CustomerData: Codable {
+    let invoices: [Invoice]
+    let payments: [Payment]
+    let transactions: [NetSuiteTransaction]
     
-    struct EntityRef: Codable {
-        let id: String
-        let refName: String?
+    init(invoices: [Invoice], payments: [Payment], transactions: [NetSuiteTransaction]) {
+        self.invoices = invoices
+        self.payments = payments
+        self.transactions = transactions
+    }
+}
+
+// MARK: - Customer Summary Model
+
+public struct CustomerSummary: Codable {
+    public let totalTransactions: Int
+    public let totalAmount: Decimal
+    public let lastTransactionDate: Date?
+    public let firstTransactionDate: Date?
+    
+    public init(totalTransactions: Int, totalAmount: Decimal, lastTransactionDate: Date?, firstTransactionDate: Date?) {
+        self.totalTransactions = totalTransactions
+        self.totalAmount = totalAmount
+        self.lastTransactionDate = lastTransactionDate
+        self.firstTransactionDate = firstTransactionDate
+    }
+}
+
+// MARK: - Customer with Sales Rep Model
+
+public struct CustomerWithSalesRep: Codable {
+    public let customerId: String
+    public let companyName: String
+    public let email: String?
+    public let phone: String?
+    public let salesRep: String
+    public let salesRepEmail: String
+    
+    public init(customerId: String, companyName: String, email: String?, phone: String?, salesRep: String, salesRepEmail: String) {
+        self.customerId = customerId
+        self.companyName = companyName
+        self.email = email
+        self.phone = phone
+        self.salesRep = salesRep
+        self.salesRepEmail = salesRepEmail
+    }
+}
+
+// MARK: - Invoice with Details Model
+
+public struct InvoiceWithDetails: Codable {
+    public let invoiceId: String
+    public let invoiceNumber: String
+    public let invoiceDate: Date?
+    public let invoiceAmount: Decimal
+    public let invoiceStatus: String
+    public let customerName: String
+    public let customerEmail: String?
+    public let lineItemCount: Int
+    public let lineItemTotal: Decimal
+    
+    public init(invoiceId: String, invoiceNumber: String, invoiceDate: Date?, invoiceAmount: Decimal, invoiceStatus: String, customerName: String, customerEmail: String?, lineItemCount: Int, lineItemTotal: Decimal) {
+        self.invoiceId = invoiceId
+        self.invoiceNumber = invoiceNumber
+        self.invoiceDate = invoiceDate
+        self.invoiceAmount = invoiceAmount
+        self.invoiceStatus = invoiceStatus
+        self.customerName = customerName
+        self.customerEmail = customerEmail
+        self.lineItemCount = lineItemCount
+        self.lineItemTotal = lineItemTotal
+    }
+}
+
+// MARK: - New Models for Enhanced Sales Order Functionality
+
+public struct NetSuiteLineItem: Identifiable, Codable {
+    public let id: String
+    public let itemName: String
+    public let unitPrice: Decimal
+    public let quantity: Double
+    public let lineAmount: Decimal
+    public let memo: String?
+    
+    public var formattedUnitPrice: String {
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: unitPrice as NSDecimalNumber) ?? "$0.00"
     }
     
-    enum CodingKeys: String, CodingKey {
-        case id, tranid, trandate, status, memo, entity, paymentmethod
+    public var formattedLineAmount: String {
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: lineAmount as NSDecimalNumber) ?? "$0.00"
+    }
+}
+
+public struct NetSuiteSalesOrderWithPayment: Identifiable, Codable {
+    public let id: String
+    public let orderNumber: String
+    public let orderDate: Date
+    public let status: String
+    public let statusName: String
+    public let customerId: String
+    public let customerName: String
+    public let orderTotal: Decimal
+    public let amountUnbilled: Decimal
+    public let foreignAmountPaid: Decimal
+    public let foreignAmountUnpaid: Decimal
+    public let paymentHold: Bool
+    public let paymentMethod: String
+    public let paymentMethodName: String
+    
+    public var formattedOrderTotal: String {
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: orderTotal as NSDecimalNumber) ?? "$0.00"
     }
     
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        self.id = try container.decode(String.self, forKey: .id)
-        self.tranid = try container.decode(String.self, forKey: .tranid)
-        self.trandate = try container.decode(String.self, forKey: .trandate)
-        self.memo = try container.decodeIfPresent(String.self, forKey: .memo)
-        self.paymentmethod = try container.decodeIfPresent(String.self, forKey: .paymentmethod)
-        
-        // Handle entity field that can be either string or object
-        if let entityString = try? container.decode(String.self, forKey: .entity) {
-            self.entity = EntityRef(id: entityString, refName: nil)
-        } else if let entityObject = try? container.decode(EntityRef.self, forKey: .entity) {
-            self.entity = entityObject
-        } else {
-            self.entity = nil
-        }
-        
-        // Handle status field that can be either string or object
-        if let statusString = try? container.decode(String.self, forKey: .status) {
-            self.status = statusString
-        } else if let statusObject = try? container.decode(StatusObject.self, forKey: .status) {
-            self.status = statusObject.refName
-        } else {
-            self.status = nil
-        }
+    public var formattedAmountUnbilled: String {
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: amountUnbilled as NSDecimalNumber) ?? "$0.00"
     }
     
-    // Helper struct for when status is an object
-    private struct StatusObject: Codable {
-        let refName: String
+    public var formattedDate: String {
+        let f = DateFormatter(); f.dateStyle = .medium; return f.string(from: orderDate)
+    }
+}
+
+public struct NetSuiteCustomerDeposit: Identifiable, Codable {
+    public let id: String
+    public let tranId: String
+    public let tranDate: Date
+    public let entity: String
+    public let customerName: String
+    public let foreignTotal: Decimal
+    public let paymentMethod: String
+    public let paymentMethodName: String
+    public let status: String
+    public let statusName: String
+    
+    public var formattedAmount: String {
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: foreignTotal as NSDecimalNumber) ?? "$0.00"
     }
     
-    // Convert to our app's CustomerPayment model
-    func toCustomerPayment() -> CustomerPayment {
-        return CustomerPayment(
-            id: id,
-            paymentNumber: tranid,
-            date: NetSuiteDateParser.parseDate(trandate) ?? Date(),
-            amount: Decimal(0), // SuiteQL doesn't provide amount
-            status: status ?? "Unknown",
-            memo: memo,
-            paymentMethod: paymentmethod
-        )
+    public var formattedDate: String {
+        let f = DateFormatter(); f.dateStyle = .medium; return f.string(from: tranDate)
     }
-} 
+}
+
+public struct NetSuiteSalesOrderWithDeposit: Identifiable, Codable {
+    public let id: String
+    public let salesOrderId: String
+    public let orderNumber: String
+    public let orderDate: Date
+    public let orderStatus: String
+    public let orderStatusName: String
+    public let customerId: String
+    public let customerName: String
+    public let orderTotal: Decimal
+    public let amountUnbilled: Decimal
+    public let orderPaymentMethod: String
+    public let orderPaymentMethodName: String
+    public let poNumber: String?
+    public let depositId: String?
+    public let depositNumber: String?
+    public let depositDate: Date?
+    public let depositAmount: Decimal
+    public let depositPaymentMethod: String?
+    public let depositPaymentMethodName: String?
+    public let depositStatus: String?
+    public let depositStatusName: String?
+    
+    public var formattedOrderTotal: String {
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: orderTotal as NSDecimalNumber) ?? "$0.00"
+    }
+    
+    public var formattedAmountUnbilled: String {
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: amountUnbilled as NSDecimalNumber) ?? "$0.00"
+    }
+    
+    public var formattedDepositAmount: String {
+        let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "USD"; f.maximumFractionDigits = 2; f.minimumFractionDigits = 2
+        return f.string(from: depositAmount as NSDecimalNumber) ?? "$0.00"
+    }
+    
+    public var formattedOrderDate: String {
+        let f = DateFormatter(); f.dateStyle = .medium; return f.string(from: orderDate)
+    }
+    
+    public var formattedDepositDate: String {
+        guard let depositDate = depositDate else { return "N/A" }
+        let f = DateFormatter(); f.dateStyle = .medium; return f.string(from: depositDate)
+    }
+}
+

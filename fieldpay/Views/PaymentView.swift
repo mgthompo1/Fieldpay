@@ -7,7 +7,7 @@ struct PaymentView: View {
     @State private var showingPaymentSheet = false
     @State private var showingStripePayment = false
     @State private var showingWindcavePayment = false
-    @State private var selectedPaymentMethod: Payment.PaymentMethod = .tapToPay
+    @State private var selectedPaymentMethod: PaymentMethodType = .tapToPay
     @State private var amount: String = ""
     @State private var selectedCustomer: Customer?
     @State private var invoiceId: String = ""
@@ -27,7 +27,7 @@ struct PaymentView: View {
                         showingCustomerPicker: $showingCustomerPicker,
                         onProcessPayment: processPayment
                     )
-                    RecentPaymentsSectionView(viewModel: viewModel)
+                    RecentPaymentsSectionView(viewModel: viewModel, customerViewModel: customerViewModel, selectedCustomer: $selectedCustomer)
                 }
                 .padding(.vertical, 20)
             }
@@ -44,15 +44,9 @@ struct PaymentView: View {
                         amount: amountValue,
                         customer: customer,
                         onPaymentSuccess: { payment in
-                            // Handle successful payment
+                            // Handle successful payment - record it, don't process again
                             Task {
-                                await viewModel.processPayment(
-                                    amount: payment.amount,
-                                    paymentMethod: payment.paymentMethod,
-                                    customerId: payment.customerId,
-                                    invoiceId: payment.invoiceId,
-                                    description: payment.description
-                                )
+                                await viewModel.recordSuccessfulPayment(payment)
                             }
                         },
                         onPaymentFailure: { error in
@@ -71,15 +65,9 @@ struct PaymentView: View {
                         amount: amountValue,
                         customer: customer,
                         onPaymentSuccess: { payment in
-                            // Handle successful payment
+                            // Handle successful payment - record it, don't process again
                             Task {
-                                await viewModel.processPayment(
-                                    amount: payment.amount,
-                                    paymentMethod: payment.paymentMethod,
-                                    customerId: payment.customerId,
-                                    invoiceId: payment.invoiceId,
-                                    description: payment.description
-                                )
+                                await viewModel.recordSuccessfulPayment(payment)
                             }
                         },
                         onPaymentFailure: { error in
@@ -104,17 +92,15 @@ struct PaymentView: View {
                     }
                 )
             }
-            .onChange(of: selectedCustomer) { _ in
-                // Load payments for selected customer
-                if let customer = selectedCustomer {
-                    Task {
-                        await viewModel.loadPaymentsForCustomer(customerId: customer.id)
-                    }
-                }
+            .onChange(of: selectedCustomer) {
+                // Customer payments will be loaded automatically by the RecentPaymentsSectionView
+                // when it detects a selected customer
             }
             .onAppear {
                 // Connect PaymentViewModel to CustomerViewModel for local payment storage
                 viewModel.setCustomerViewModel(customerViewModel)
+                
+                // Don't load all payments - we'll load customer-specific payments when a customer is selected
             }
         }
     }
@@ -186,7 +172,7 @@ struct PaymentHeaderView: View {
 struct QuickPaymentCardView: View {
     @Binding var amount: String
     @Binding var selectedCustomer: Customer?
-    @Binding var selectedPaymentMethod: Payment.PaymentMethod
+    @Binding var selectedPaymentMethod: PaymentMethodType
     @Binding var showingCustomerPicker: Bool
     let onProcessPayment: () -> Void
     
@@ -322,7 +308,7 @@ struct AmountInputView: View {
 
 // MARK: - Payment Method Selection View
 struct PaymentMethodSelectionView: View {
-    @Binding var selectedPaymentMethod: Payment.PaymentMethod
+    @Binding var selectedPaymentMethod: PaymentMethodType
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -334,7 +320,7 @@ struct PaymentMethodSelectionView: View {
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 12) {
-                ForEach(Payment.PaymentMethod.quickPaymentMethods, id: \.self) { method in
+                ForEach(PaymentMethodType.quickPaymentMethods, id: \.self) { method in
                     ModernPaymentMethodButton(
                         method: method,
                         isSelected: selectedPaymentMethod == method
@@ -380,6 +366,8 @@ struct ProcessPaymentButtonView: View {
 // MARK: - Recent Payments Section View
 struct RecentPaymentsSectionView: View {
     @ObservedObject var viewModel: PaymentViewModel
+    @ObservedObject var customerViewModel: CustomerViewModel
+    @Binding var selectedCustomer: Customer?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -398,24 +386,50 @@ struct RecentPaymentsSectionView: View {
             }
             .padding(.horizontal, 20)
             
-            if viewModel.isLoading {
+            if selectedCustomer == nil {
+                // No customer selected - show message
+                VStack(spacing: 16) {
+                    Image(systemName: "person.crop.circle.badge.questionmark")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Select a Customer")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    Text("Choose a customer to view their recent payments")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+                .padding(.horizontal, 20)
+            } else if customerViewModel.isLoadingPayments {
                 ModernLoadingView(message: "Loading payments...")
-            } else if let errorMessage = viewModel.errorMessage {
+            } else if let errorMessage = customerViewModel.paymentsError {
                 ModernErrorView(
                     message: errorMessage,
-                    retryAction: { viewModel.loadPayments() }
+                    retryAction: {
+                        if let customer = selectedCustomer {
+                            Task {
+                                await customerViewModel.loadCustomerPayments(customerId: customer.id)
+                            }
+                        }
+                    }
                 )
-            } else if viewModel.payments.isEmpty {
+            } else if customerViewModel.customerPayments.isEmpty {
                 ModernEmptyStateView(
                     icon: "creditcard",
-                    title: "No Payments Yet",
-                    subtitle: "Your payment history will appear here"
+                    title: "No Payments Found",
+                    subtitle: "This customer has no payment history yet"
                 )
                 .padding(.horizontal, 20)
             } else {
                 VStack(spacing: 12) {
-                    ForEach(Array(viewModel.payments.prefix(5)), id: \.id) { payment in
-                        ModernPaymentRow(payment: payment)
+                    ForEach(Array(customerViewModel.customerPayments.prefix(5)), id: \.id) { payment in
+                        ModernCustomerPaymentRow(payment: payment)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -492,7 +506,7 @@ struct ModernPaymentRow: View {
 
 // MARK: - Modern Payment Method Button
 struct ModernPaymentMethodButton: View {
-    let method: Payment.PaymentMethod
+    let method: PaymentMethodType
     let isSelected: Bool
     let action: () -> Void
     
@@ -757,6 +771,85 @@ struct PaymentTapToPayView: View {
                     }
                 }
             }
+        }
+    }
+} 
+
+// MARK: - Modern Customer Payment Row
+struct ModernCustomerPaymentRow: View {
+    let payment: CustomerPayment
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Payment Icon
+            Circle()
+                .fill(
+                    LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Image(systemName: "creditcard.fill")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                )
+            
+            // Payment Details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(payment.paymentNumber)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text(payment.date, style: .date)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                if let memo = payment.memo, !memo.isEmpty {
+                    Text(memo)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            
+            Spacer()
+            
+            // Amount and Status
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(String(format: "$%.2f", (payment.amount as NSDecimalNumber).doubleValue))
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
+                Text(payment.status)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(statusColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(statusColor.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.03), radius: 4, x: 0, y: 2)
+    }
+    
+    private var statusColor: Color {
+        // Map NetSuite status to colors
+        let status = payment.status.lowercased()
+        if status.contains("deposited") || status.contains("paid") {
+            return .green
+        } else if status.contains("not deposited") || status.contains("open") {
+            return .orange
+        } else if status.contains("pending") {
+            return .blue
+        } else if status.contains("failed") || status.contains("void") {
+            return .red
+        } else {
+            return .gray
         }
     }
 } 

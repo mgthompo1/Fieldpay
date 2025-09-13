@@ -287,6 +287,7 @@ struct WindcaveQRPaymentView: View {
             // Cancel session monitoring when view disappears
             sessionPollingTask?.cancel()
             sessionPollingTask = nil
+            isMonitoringSession = false
         }
     }
     
@@ -376,19 +377,23 @@ struct WindcaveQRPaymentView: View {
                         print("  - Response Text: \(sessionStatus.responseText ?? "nil")")
                         print("  - isCompleted: \(sessionStatus.isCompleted)")
                         print("  - isApproved: \(sessionStatus.isApproved)")
-                        
-                        // Check if payment is completed
-                        if sessionStatus.isCompleted {
-                            if sessionStatus.isApproved {
-                                print("Debug: WindcaveQRPaymentView - Payment successful!")
+                    }
+                    
+                    // Check if payment is completed (outside MainActor.run)
+                    if sessionStatus.isCompleted {
+                        if sessionStatus.isApproved {
+                            print("Debug: WindcaveQRPaymentView - Payment successful!")
+                            await MainActor.run {
                                 handlePaymentSuccess(sessionStatus)
-                            } else {
-                                print("Debug: WindcaveQRPaymentView - Payment failed or declined")
+                            }
+                        } else {
+                            print("Debug: WindcaveQRPaymentView - Payment failed or declined")
+                            await MainActor.run {
                                 handlePaymentFailure(sessionStatus)
                             }
-                            isMonitoringSession = false
-                            return
                         }
+                        isMonitoringSession = false
+                        break // Exit the while loop
                     }
                     
                     // Wait 3 seconds before next poll

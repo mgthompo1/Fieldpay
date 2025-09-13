@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var showingNetSuiteDebug = false
     @State private var showingPaymentConfiguration = false
     @State private var showingCompanyBranding = false
+
     
     var body: some View {
         NavigationView {
@@ -100,6 +101,8 @@ struct SettingsView: View {
                         }
                     }
                     .buttonStyle(PlainButtonStyle())
+                    
+
                     
                     Button(action: {
                         print("Debug: NetSuite Settings button tapped")
@@ -910,7 +913,7 @@ struct CompanyBrandingView: View {
                     }
                 }
             }
-            .onChange(of: selectedPhoto) { newPhoto in
+            .onChange(of: selectedPhoto) { _, newPhoto in
                 Task {
                     if let newPhoto = newPhoto {
                         if let data = try? await newPhoto.loadTransferable(type: Data.self),

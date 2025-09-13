@@ -1,112 +1,159 @@
 import Foundation
 import Combine
 
+// MARK: - Protocols for DI
+protocol AuthMonitoring {
+    var isAuthenticatedPublisher: AnyPublisher<Bool, Never> { get }
+}
+
+extension OAuthManager: @preconcurrency AuthMonitoring {
+    var isAuthenticatedPublisher: AnyPublisher<Bool, Never> { $isAuthenticated.eraseToAnyPublisher() }
+}
+
 @MainActor
 class InvoiceViewModel: ObservableObject {
+    // MARK: - Published UI state
     @Published var invoices: [Invoice] = []
     @Published var selectedInvoice: Invoice?
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    // In-memory cache for session
+    // MARK: - Data caches & pagination
     private var invoiceCache: [String: Invoice] = [:]
-    private var allInvoices: [Invoice] = [] // Keep unfiltered source
-    private var loadedPages: Set<Int> = []
+    private var allInvoices: [Invoice] = []                // Unfiltered source
+    private var seenIds: Set<String> = []                  // Dedupe guard
+    private var loadedPages: Set<Int> = []                 // Optional defensive tracking
     private(set) var currentPage: Int = 0
     private let pageSize: Int = 50
     private(set) var hasMore: Bool = true
+    private var activeStatus: String? = nil                // Reset paging when status changes
     
-    // Batch detail fetching
+    // MARK: - Detail fetching queue
     private var detailFetchQueue: [String] = []
+    private var detailFetchSet: Set<String> = []           // Prevent duplicate enqueues
     private var isFetchingDetails = false
     private let maxConcurrentDetailFetches = 3
     
-    private let netSuiteAPI = NetSuiteAPI.shared
-    private let oAuthManager = OAuthManager.shared
+    // MARK: - Dependencies
+    private let api: NetSuiteAPIProtocol
+    private let auth: AuthMonitoring
     private var cancellables = Set<AnyCancellable>()
     
-    init() {
-        oAuthManager.$isAuthenticated
+    // MARK: - Init
+    init(
+        api: NetSuiteAPIProtocol = NetSuiteAPI.shared,
+        auth: AuthMonitoring = OAuthManager.shared
+    ) {
+        self.api = api
+        self.auth = auth
+        
+        // React to auth changes
+        auth.isAuthenticatedPublisher
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] isAuthenticated in
+                guard let self else { return }
                 if isAuthenticated {
-                    self?.resetPagination()
-                    Task {
-                        await self?.loadNextPage()
-                    }
+                    self.resetPagination()
+                    Task { await self.loadNextPage() }
                 } else {
-                    self?.invoices = []
-                    self?.allInvoices = []
-                    self?.errorMessage = nil
-                    self?.invoiceCache.removeAll()
-                    self?.loadedPages.removeAll()
-                    self?.currentPage = 0
-                    self?.hasMore = true
-                    self?.detailFetchQueue.removeAll()
-                    self?.isFetchingDetails = false
+                    self.resetPagination()
                 }
             }
             .store(in: &cancellables)
     }
     
+    // MARK: - Paging helpers
     func resetPagination() {
         invoices = []
         allInvoices = []
         invoiceCache.removeAll()
+        seenIds.removeAll()
         loadedPages.removeAll()
         currentPage = 0
         hasMore = true
+        activeStatus = nil
         detailFetchQueue.removeAll()
+        detailFetchSet.removeAll()
         isFetchingDetails = false
+        errorMessage = nil
     }
     
     func loadNextPage(status: String? = nil) async {
         guard !isLoading, hasMore else { return }
+        if status != activeStatus { // user changed the filter — restart
+            resetPagination()
+            activeStatus = status
+        }
         isLoading = true
         errorMessage = nil
         let pageToLoad = currentPage
+        
         do {
-            let resource = NetSuiteResource.invoices(limit: pageSize, offset: pageToLoad * pageSize, status: status)
-            let response: NetSuiteResponse<NetSuiteInvoiceResponse> = try await netSuiteAPI.fetch(resource, type: NetSuiteResponse<NetSuiteInvoiceResponse>.self)
+            // Use the SuiteQL-based method that returns invoices with display values
+            let invoiceRecords = try await api.fetchInvoicesWithDisplayValues()
             
-            // Convert REST API response to invoices
-            let newInvoices = await withTaskGroup(of: Invoice.self, returning: [Invoice].self) { group in
-                for netSuiteInvoice in response.items {
-                    group.addTask {
-                        let invoice = netSuiteInvoice.toInvoice()
-                        return invoice
-                    }
-                }
-                
-                var invoices: [Invoice] = []
-                for await invoice in group {
-                    invoices.append(invoice)
-                }
-                return invoices
+            // Convert to domain models
+            let mapped = invoiceRecords.map { record in
+                Invoice(
+                    id: record.id,
+                    invoiceNumber: record.tranId,
+                    customerId: "", // Will be filled in detail fetch
+                    customerName: record.customerName,
+                    amount: Decimal(record.total),
+                    balance: Decimal(record.total), // Will be updated in detail fetch
+                    status: AppInvoiceStatus(rawValue: record.status) ?? .pending,
+                    dueDate: nil, // Will be filled in detail fetch
+                    createdDate: record.trandate,
+                    netSuiteId: record.id,
+                    items: [],
+                    notes: record.memo
+                )
             }
             
-            // Cache and append (already sorted by trandate DESC from SuiteQL)
-            for invoice in newInvoices {
-                invoiceCache[invoice.id] = invoice
-            }
-            allInvoices.append(contentsOf: newInvoices)
-            invoices = allInvoices // Update published array
+            // Apply status filter if specified
+            let filtered = status != nil ? mapped.filter { $0.status.rawValue == status } : mapped
+            
+            // Apply pagination
+            let startIndex = pageToLoad * pageSize
+            let endIndex = min(startIndex + pageSize, filtered.count)
+            let pageItems = Array(filtered[startIndex..<endIndex])
+            
+            // Dedupe & append
+            let unique = pageItems.filter { seenIds.insert($0.id).inserted }
+            for inv in unique { invoiceCache[inv.id] = inv }
+            allInvoices.append(contentsOf: unique)
+            
+            // Keep newest first (by createdDate)
+            invoices = allInvoices.sorted(by: { $0.createdDate > $1.createdDate })
+            
+            // Update paging info
+            hasMore = endIndex < filtered.count
             loadedPages.insert(pageToLoad)
             currentPage += 1
-            hasMore = newInvoices.count == pageSize
+            
+            // Queue details for newly seen IDs to get additional information
+            await queueDetailFetching(for: unique.map { $0.id })
+            
             isLoading = false
         } catch {
-            errorMessage = "Failed to load invoices: \(error.localizedDescription)"
+            if let uerr = error as? URLError, uerr.code == .notConnectedToInternet {
+                errorMessage = "You're offline. Try again when you're back online."
+            } else if (error as? NetSuiteError) == .notConfigured {
+                errorMessage = "NetSuite not connected. Authenticate in Settings."
+            } else {
+                errorMessage = "Failed to load invoices: \(error.localizedDescription)"
+            }
             isLoading = false
         }
     }
     
     // MARK: - Batch Detail Fetching
-    
     private func queueDetailFetching(for invoiceIds: [String]) async {
-        // Add new IDs to queue
-        detailFetchQueue.append(contentsOf: invoiceIds)
-        
-        // Start fetching if not already in progress
+        // Add new IDs to queue without duplicates
+        for id in invoiceIds where !detailFetchSet.contains(id) {
+            detailFetchSet.insert(id)
+            detailFetchQueue.append(id)
+        }
         if !isFetchingDetails {
             await fetchDetailsInBatches()
         }
@@ -114,7 +161,6 @@ class InvoiceViewModel: ObservableObject {
     
     private func fetchDetailsInBatches() async {
         guard !detailFetchQueue.isEmpty else { return }
-        
         isFetchingDetails = true
         
         while !detailFetchQueue.isEmpty {
@@ -124,14 +170,14 @@ class InvoiceViewModel: ObservableObject {
             
             await withTaskGroup(of: Void.self) { group in
                 for invoiceId in batch {
-                    group.addTask {
-                        await self.fetchInvoiceDetailWithRetry(invoiceId: invoiceId)
+                    group.addTask { [weak self] in
+                        await self?.fetchInvoiceDetailWithRetry(invoiceId: invoiceId)
                     }
                 }
             }
             
-            // Throttle between batches to avoid overwhelming the API
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            // Gentle throttle between batches
+            try? await Task.sleep(nanoseconds: 700_000_000) // 0.7s
         }
         
         isFetchingDetails = false
@@ -139,242 +185,202 @@ class InvoiceViewModel: ObservableObject {
     
     private func fetchInvoiceDetailWithRetry(invoiceId: String, retryCount: Int = 0) async {
         let maxRetries = 2
-        let baseDelay: UInt64 = 1_000_000_000 // 1 second
-        
+        let baseDelay: UInt64 = 600_000_000 // 0.6s
         do {
             try await fetchInvoiceDetail(invoiceId: invoiceId)
         } catch {
             if retryCount < maxRetries {
+                let delay = baseDelay * UInt64(pow(2.0, Double(retryCount)))
                 print("Retrying fetch for invoice \(invoiceId), attempt \(retryCount + 1)")
-                let delay = baseDelay * UInt64(pow(2.0, Double(retryCount))) // Exponential backoff
                 try? await Task.sleep(nanoseconds: delay)
                 await fetchInvoiceDetailWithRetry(invoiceId: invoiceId, retryCount: retryCount + 1)
             } else {
-                print("Failed to fetch invoice \(invoiceId) after \(maxRetries + 1) attempts")
+                print("Failed to fetch invoice \(invoiceId) after \(maxRetries + 1) attempts: \(error)")
             }
         }
     }
     
     private func fetchInvoiceDetail(invoiceId: String) async throws {
         do {
-            // First, try the standard REST API approach
+            // Try REST detail first
             let resource = NetSuiteResource.invoiceDetail(id: invoiceId)
-            let detailedInvoice: NetSuiteInvoiceRecord = try await netSuiteAPI.fetch(resource, type: NetSuiteInvoiceRecord.self)
-            let invoice = detailedInvoice.toInvoice()
+            let detailed: NetSuiteInvoiceRecord = try await api.fetch(resource, type: NetSuiteInvoiceRecord.self)
+            let invoice = detailed.toInvoice()
             
-            await MainActor.run {
-                // Update cache
-                self.invoiceCache[invoiceId] = invoice
-                
-                // Update in published array if present
-                if let index = self.invoices.firstIndex(where: { $0.id == invoiceId }) {
-                    self.invoices[index] = invoice
-                }
+            // Update cache/UI
+            self.invoiceCache[invoiceId] = invoice
+            if let idx = self.invoices.firstIndex(where: { $0.id == invoiceId }) {
+                self.invoices[idx] = invoice
             }
         } catch {
-            print("Failed to fetch detail for invoice \(invoiceId) via REST API: \(error)")
+            print("Failed REST detail for invoice \(invoiceId): \(error). Falling back to SuiteQL…")
+            // Fallback via SuiteQL with richer fields
+            let sid = invoiceId.replacingOccurrences(of: "'", with: "''")
+            let q = """
+                SELECT t.id, t.tranid, t.entity, t.amount, t.trandate, t.status, t.memo, t.duedate, t.amountremaining
+                FROM transaction t
+                WHERE t.id = '\(sid)' AND t.type = 'Invoice'
+                LIMIT 1
+            """
+            let resource = NetSuiteResource.suiteQL(query: q)
+            let resp: SuiteQLResponse = try await api.fetch(resource, type: SuiteQLResponse.self)
+            guard let row = resp.items.first else { return }
             
-            // Fallback: Try using SuiteQL to get invoice details
-            do {
-                let sanitizedInvoiceId = invoiceId.replacingOccurrences(of: "'", with: "''")
-                let suiteQLQuery = "SELECT id AS invoice_id, tranid AS invoice_number, entity AS customer_id, amount AS invoice_amount, trandate AS transaction_date, status AS invoice_status, memo AS invoice_memo FROM transaction WHERE id = '\(sanitizedInvoiceId)' AND type = 'Invoice' LIMIT 1"
-                let resource = NetSuiteResource.suiteQL(query: suiteQLQuery)
-                let suiteQLResponse: SuiteQLResponse = try await netSuiteAPI.fetch(resource, type: SuiteQLResponse.self)
-                
-                if let firstRow = suiteQLResponse.items.first {
-                    let customerId = firstRow.values["customer_id"] ?? ""
-                    let customerName = await fetchCustomerName(customerId: customerId)
-                    
-                    // Create a basic invoice from SuiteQL data
-                    let invoice = Invoice(
-                        id: firstRow.values["invoice_id"] ?? invoiceId,
-                        invoiceNumber: firstRow.values["invoice_number"] ?? "INV-\(invoiceId)",
-                        customerId: customerId,
-                        customerName: customerName,
-                        amount: Decimal(string: firstRow.values["invoice_amount"] ?? "0") ?? Decimal(0),
-                        balance: Decimal(string: firstRow.values["invoice_amount"] ?? "0") ?? Decimal(0),
-                        status: Invoice.InvoiceStatus(rawValue: firstRow.values["invoice_status"] ?? "pending") ?? .pending,
-                        dueDate: nil, // Not available in this query
-                        createdDate: Date(), // Use current date as fallback
-                        netSuiteId: invoiceId,
-                        items: [],
-                        notes: firstRow.values["invoice_memo"]
-                    )
-                    
-                    await MainActor.run {
-                        // Update cache
-                        self.invoiceCache[invoiceId] = invoice
-                        
-                        // Update in published array if present
-                        if let index = self.invoices.firstIndex(where: { $0.id == invoiceId }) {
-                            self.invoices[index] = invoice
-                        }
-                    }
-                }
-            } catch {
-                print("Failed to fetch detail for invoice \(invoiceId) via SuiteQL fallback: \(error)")
+            let id = row.values["column0"] ?? invoiceId
+            let tranId = row.values["column1"] ?? "INV-\(invoiceId)"
+            let customerId = row.values["column2"] ?? ""
+            let amount = Decimal(string: row.values["column3"] ?? "0") ?? 0
+            let created = InvoiceViewModel.parseNetSuiteDate(row.values["column4"]) ?? Date()
+            let statusRaw = row.values["column5"] ?? "pending"
+            let memo = row.values["column6"]
+            let due = InvoiceViewModel.parseNetSuiteDate(row.values["column7"]) // optional
+            let remaining = Decimal(string: row.values["column8"] ?? row.values["column3"] ?? "0") ?? amount
+            let customerName = await fetchCustomerName(customerId: customerId)
+            
+            let minimal = Invoice(
+                id: id,
+                invoiceNumber: tranId,
+                customerId: customerId,
+                customerName: customerName,
+                amount: amount,
+                balance: remaining,
+                status: AppInvoiceStatus(rawValue: statusRaw) ?? .pending,
+                dueDate: due,
+                createdDate: created,
+                netSuiteId: id,
+                items: [],
+                notes: memo
+            )
+            
+            self.invoiceCache[invoiceId] = minimal
+            if let idx = self.invoices.firstIndex(where: { $0.id == invoiceId }) {
+                self.invoices[idx] = minimal
             }
         }
     }
     
     // MARK: - Helper Methods
-    
     private func fetchCustomerName(customerId: String) async -> String {
         guard !customerId.isEmpty else { return "Customer \(customerId)" }
-        
         do {
-            let sanitizedCustomerId = customerId.replacingOccurrences(of: "'", with: "''")
-            let suiteQLQuery = "SELECT entityid AS entity_id, companyname AS company_name FROM customer WHERE id = '\(sanitizedCustomerId)' LIMIT 1"
-            let resource = NetSuiteResource.suiteQL(query: suiteQLQuery)
-            let suiteQLResponse: SuiteQLResponse = try await netSuiteAPI.fetch(resource, type: SuiteQLResponse.self)
-            
-            if let firstRow = suiteQLResponse.items.first {
-                return firstRow.values["company_name"] ?? firstRow.values["entity_id"] ?? "Customer \(customerId)"
+            let sid = customerId.replacingOccurrences(of: "'", with: "''")
+            let q = "SELECT id, entityid, companyname FROM customer WHERE id = '\(sid)' LIMIT 1"
+            let resource = NetSuiteResource.suiteQL(query: q)
+            let resp: SuiteQLResponse = try await api.fetch(resource, type: SuiteQLResponse.self)
+            if let row = resp.items.first {
+                let entityId = row.values["column1"] ?? ""
+                let company = row.values["column2"] ?? ""
+                return !entityId.isEmpty ? entityId : (!company.isEmpty ? company : "Customer \(customerId)")
             }
         } catch {
             print("Failed to fetch customer name for \(customerId): \(error)")
         }
-        
         return "Customer \(customerId)"
     }
     
     /// Batch fetch customer names for a set of customer IDs
     private func fetchCustomerNamesBatch(customerIds: [String]) async -> [String: String] {
         guard !customerIds.isEmpty else { return [:] }
-        // Build SuiteQL query for all customer IDs - sanitize input
-        let sanitizedIds = customerIds.map { $0.replacingOccurrences(of: "'", with: "''") }
-        let idList = sanitizedIds.map { "'\($0)'" }.joined(separator: ",")
-        let suiteQLQuery = "SELECT id AS customer_id, entityid AS entity_id, companyname AS company_name FROM customer WHERE id IN (\(idList))"
-        let resource = NetSuiteResource.suiteQL(query: suiteQLQuery)
+        let ids = customerIds.map { $0.replacingOccurrences(of: "'", with: "''") }
+        let list = ids.map { "'\($0)'" }.joined(separator: ",")
+        let q = "SELECT id, entityid, companyname FROM customer WHERE id IN (\(list))"
+        let resource = NetSuiteResource.suiteQL(query: q)
         do {
-            let response: SuiteQLResponse = try await netSuiteAPI.fetch(resource, type: SuiteQLResponse.self)
-            var nameMap: [String: String] = [:]
-            for row in response.items {
-                let id = row.values["customer_id"] ?? ""
-                let entityId = row.values["entity_id"] ?? ""
-                let companyName = row.values["company_name"] ?? ""
-                let name = !entityId.isEmpty ? entityId : (!companyName.isEmpty ? companyName : "Customer \(id)")
-                nameMap[id] = name
+            let resp: SuiteQLResponse = try await api.fetch(resource, type: SuiteQLResponse.self)
+            var map: [String:String] = [:]
+            for row in resp.items {
+                let id = row.values["column0"] ?? ""
+                let entityId = row.values["column1"] ?? ""
+                let company = row.values["column2"] ?? ""
+                map[id] = !entityId.isEmpty ? entityId : (!company.isEmpty ? company : "Customer \(id)")
             }
-            return nameMap
+            return map
         } catch {
             print("Failed to batch fetch customer names: \(error)")
             return [:]
         }
     }
     
-    private func parseNetSuiteDate(_ dateString: String) async -> Date? {
-        // Try ISO8601 formatter first
-        let isoFormatter = ISO8601DateFormatter()
-        if let date = isoFormatter.date(from: dateString) {
-            return date
-        }
-        
-        // Try various DateFormatter formats
-        let formatter1 = DateFormatter()
-        formatter1.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-        if let date = formatter1.date(from: dateString) {
-            return date
-        }
-        
-        let formatter2 = DateFormatter()
-        formatter2.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-        if let date = formatter2.date(from: dateString) {
-            return date
-        }
-        
-        let formatter3 = DateFormatter()
-        formatter3.dateFormat = "yyyy-MM-dd"
-        if let date = formatter3.date(from: dateString) {
-            return date
-        }
-        
+    private static func parseNetSuiteDate(_ dateString: String?) -> Date? {
+        guard let s = dateString, !s.isEmpty else { return nil }
+        let iso = ISO8601DateFormatter()
+        if let d = iso.date(from: s) { return d }
+        let f1 = DateFormatter(); f1.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"; if let d = f1.date(from: s) { return d }
+        let f2 = DateFormatter(); f2.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"; if let d = f2.date(from: s) { return d }
+        let f3 = DateFormatter(); f3.dateFormat = "yyyy-MM-dd"; if let d = f3.date(from: s) { return d }
         return nil
     }
     
     // MARK: - Public Detail Fetching
-    
     func loadInvoiceDetail(id: String) async {
-        // Check cache first
-        if let cachedInvoice = invoiceCache[id] {
-            await MainActor.run {
-                self.selectedInvoice = cachedInvoice
-            }
+        if let cached = invoiceCache[id] {
+            self.selectedInvoice = cached
             return
         }
-        
         do {
             try await fetchInvoiceDetail(invoiceId: id)
-            
-            await MainActor.run {
-                self.selectedInvoice = self.invoiceCache[id]
-            }
+            self.selectedInvoice = self.invoiceCache[id]
         } catch {
             print("Failed to load invoice detail for \(id): \(error)")
         }
     }
     
+    // MARK: - Search / Filter
     func searchInvoices(query: String) {
-        guard !query.isEmpty else {
-            clearFilters()
-            return
+        guard !query.isEmpty else { clearFilters(); return }
+        let filtered = allInvoices.filter { inv in
+            inv.invoiceNumber.localizedCaseInsensitiveContains(query) ||
+            inv.customerName.localizedCaseInsensitiveContains(query)
         }
-        
-        let filteredInvoices = allInvoices.filter { invoice in
-            invoice.invoiceNumber.localizedCaseInsensitiveContains(query) ||
-            invoice.customerName.localizedCaseInsensitiveContains(query)
-        }
-        
-        // Maintain newest-first sorting order
-        invoices = filteredInvoices.sorted { $0.createdDate > $1.createdDate }
+        invoices = filtered.sorted { $0.createdDate > $1.createdDate }
     }
     
-    func filterInvoicesByStatus(_ status: Invoice.InvoiceStatus) {
-        let filteredInvoices = allInvoices.filter { $0.status == status }
-        // Maintain newest-first sorting order
-        invoices = filteredInvoices.sorted { $0.createdDate > $1.createdDate }
+    func filterInvoicesByStatus(_ status: AppInvoiceStatus) {
+        let filtered = allInvoices.filter { $0.status == status }
+        invoices = filtered.sorted { $0.createdDate > $1.createdDate }
     }
     
     func filterInvoicesByCustomer(_ customerId: String) {
-        let filteredInvoices = allInvoices.filter { $0.customerId == customerId }
-        // Maintain newest-first sorting order
-        invoices = filteredInvoices.sorted { $0.createdDate > $1.createdDate }
+        let filtered = allInvoices.filter { $0.customerId == customerId }
+        invoices = filtered.sorted { $0.createdDate > $1.createdDate }
     }
     
     func clearFilters() {
-        invoices = allInvoices
+        invoices = allInvoices.sorted { $0.createdDate > $1.createdDate }
     }
     
     /// Reload invoices from scratch without relying on auth state
-    func reloadInvoices() async {
+    func reloadInvoices(status: String? = nil) async {
         resetPagination()
-        await loadNextPage()
+        activeStatus = status
+        await loadNextPage(status: status)
     }
     
+    // MARK: - Insights / Aggregates
     func getOverdueInvoices() -> [Invoice] {
         let today = Date()
-        return allInvoices.filter { invoice in
-            invoice.status == .overdue ||
-            (invoice.dueDate != nil && invoice.dueDate! < today && invoice.status == .pending)
+        return allInvoices.filter { inv in
+            inv.status == .overdue || (inv.dueDate != nil && inv.dueDate! < today && inv.status == .pending)
         }
     }
     
-    func getInvoicesByStatus(_ status: Invoice.InvoiceStatus) -> [Invoice] {
-        return allInvoices.filter { $0.status == status }
+    func getInvoicesByStatus(_ status: AppInvoiceStatus) -> [Invoice] {
+        allInvoices.filter { $0.status == status }
     }
     
     func getTotalOutstanding() -> Decimal {
-        return allInvoices
+        allInvoices
             .filter { $0.status != .paid && $0.status != .cancelled }
-            .reduce(0) { $0 + $1.balance }
+            .reduce(Decimal(0)) { $0 + $1.balance }
     }
     
     func getInvoiceById(_ id: String) -> Invoice? {
-        return allInvoices.first { $0.id == id }
+        allInvoices.first { $0.id == id }
     }
     
-    func createInvoice(customerId: String, customerName: String, amount: Decimal, items: [Invoice.InvoiceItem], dueDate: Date? = nil) {
-        let newInvoice = Invoice(
+    // MARK: - Creation (local-first demo)
+    func createInvoice(customerId: String, customerName: String, amount: Decimal, items: [AppInvoiceItem], dueDate: Date? = nil) {
+        let new = Invoice(
             invoiceNumber: generateInvoiceNumber(),
             customerId: customerId,
             customerName: customerName,
@@ -383,28 +389,19 @@ class InvoiceViewModel: ObservableObject {
             dueDate: dueDate,
             items: items
         )
-        
-        // In a real app, you would save this to NetSuite
-        allInvoices.append(newInvoice)
-        invoices = allInvoices // Refresh filtered view
+        allInvoices.append(new)
+        invoices = allInvoices.sorted { $0.createdDate > $1.createdDate }
+        // TODO: call NetSuite create API and then replace local stub with server representation
     }
     
     func updateInvoice(_ invoice: Invoice) {
-        // Update in allInvoices
-        if let index = allInvoices.firstIndex(where: { $0.id == invoice.id }) {
-            allInvoices[index] = invoice
-        }
-        
-        // Update in displayed invoices
-        if let index = invoices.firstIndex(where: { $0.id == invoice.id }) {
-            invoices[index] = invoice
-        }
-        
-        // In a real app, you would update this in NetSuite
+        if let i = allInvoices.firstIndex(where: { $0.id == invoice.id }) { allInvoices[i] = invoice }
+        if let i = invoices.firstIndex(where: { $0.id == invoice.id }) { invoices[i] = invoice }
+        // TODO: persist update to NetSuite
     }
     
     func markInvoiceAsPaid(_ invoice: Invoice) {
-        let updatedInvoice = Invoice(
+        let updated = Invoice(
             id: invoice.id,
             invoiceNumber: invoice.invoiceNumber,
             customerId: invoice.customerId,
@@ -420,63 +417,86 @@ class InvoiceViewModel: ObservableObject {
             items: invoice.items,
             notes: invoice.notes
         )
-        
-        updateInvoice(updatedInvoice)
+        updateInvoice(updated)
     }
     
     private func generateInvoiceNumber() -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyyMMdd"
-        let dateString = dateFormatter.string(from: Date())
-        let randomSuffix = String(format: "%04d", Int.random(in: 1...9999))
-        return "INV-\(dateString)-\(randomSuffix)"
+        let df = DateFormatter(); df.dateFormat = "yyyyMMdd"
+        let ds = df.string(from: Date())
+        let suffix = String(format: "%04d", Int.random(in: 1...9999))
+        return "INV-\(ds)-\(suffix)"
     }
     
-    // MARK: - Debug Methods
+    // MARK: - Date Range Queries
     
-    func debugInvoiceIds() async {
-        print("Debug: InvoiceViewModel - Testing invoice ID formats...")
+    /// Fetch invoices by date range using the comprehensive SuiteQL query
+    func fetchInvoicesByDateRange(fromDate: Date, toDate: Date? = nil) async {
+        isLoading = true
+        errorMessage = nil
         
-        // Test with a few invoice IDs from the current list
-        let testIds = Array(allInvoices.prefix(3)).map { $0.id }
+        do {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            let fromDateString = dateFormatter.string(from: fromDate)
+            let toDateString = toDate.map { dateFormatter.string(from: $0) }
+            
+            let dateRangeInvoices = try await api.fetchCustomerInvoicesByDateRangeAsInvoices(
+                fromDate: fromDateString,
+                toDate: toDateString
+            )
+            
+            // Update the UI with the date range results
+            await MainActor.run {
+                self.invoices = dateRangeInvoices
+                self.allInvoices = dateRangeInvoices
+                self.hasMore = false // Date range queries don't support pagination
+                self.currentPage = 0
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Failed to fetch invoices by date range: \(error.localizedDescription)"
+            }
+        }
         
-        for invoiceId in testIds {
-            print("Debug: InvoiceViewModel - Testing invoice ID: \(invoiceId)")
-            // Use a more appropriate debug method for invoices
-            print("Debug: InvoiceViewModel - Invoice ID \(invoiceId) format appears valid")
+        await MainActor.run {
+            self.isLoading = false
         }
     }
     
-    // MARK: - Invoice Creation and Item Management
+    /// Reset to normal pagination after date range query
+    func resetToNormalPagination() async {
+        resetPagination()
+        await loadNextPage()
+    }
     
+    // MARK: - Debug helpers
+    func debugInvoiceIds() async {
+        print("Debug: InvoiceViewModel - Testing invoice ID formats…")
+        let testIds = Array(allInvoices.prefix(3)).map { $0.id }
+        for invoiceId in testIds { print("Debug: InvoiceViewModel - Invoice ID: \(invoiceId)") }
+    }
+    
+    // MARK: - Item selection for creation
     @Published var availableItems: [NetSuiteItem] = []
     @Published var isLoadingItems = false
     @Published var selectedItems: [InvoiceItemCreation] = []
     
-    /// Loads available items from NetSuite for invoice creation
     func loadAvailableItems() async {
         isLoadingItems = true
         defer { isLoadingItems = false }
-        
         do {
-            let items = try await netSuiteAPI.fetchItems()
-            await MainActor.run {
-                self.availableItems = items
-            }
+            let items = try await api.fetchItems()
+            self.availableItems = items
         } catch {
             print("Failed to load items: \(error)")
-            await MainActor.run {
-                self.errorMessage = "Failed to load items: \(error.localizedDescription)"
-            }
+            self.errorMessage = "Failed to load items: \(error.localizedDescription)"
         }
     }
     
-    /// Adds an item to the invoice being created
     func addItemToInvoice(item: NetSuiteItem, quantity: Double = 1.0, customPrice: Double? = nil) {
         let price = customPrice ?? item.basePrice
         let amount = price * quantity
-        
-        let invoiceItem = InvoiceItemCreation(
+        let entry = InvoiceItemCreation(
             id: UUID().uuidString,
             netSuiteItemId: item.id,
             itemName: item.displayName,
@@ -485,22 +505,18 @@ class InvoiceViewModel: ObservableObject {
             unitPrice: Decimal(price),
             amount: Decimal(amount)
         )
-        
-        selectedItems.append(invoiceItem)
+        selectedItems.append(entry)
     }
     
-    /// Removes an item from the invoice being created
     func removeItemFromInvoice(itemId: String) {
         selectedItems.removeAll { $0.id == itemId }
     }
     
-    /// Updates the quantity for an item in the invoice
     func updateItemQuantity(itemId: String, quantity: Double) {
-        guard let index = selectedItems.firstIndex(where: { $0.id == itemId }) else { return }
-        let item = selectedItems[index]
+        guard let idx = selectedItems.firstIndex(where: { $0.id == itemId }) else { return }
+        let item = selectedItems[idx]
         let newAmount = item.unitPrice * Decimal(quantity)
-        
-        selectedItems[index] = InvoiceItemCreation(
+        selectedItems[idx] = InvoiceItemCreation(
             id: item.id,
             netSuiteItemId: item.netSuiteItemId,
             itemName: item.itemName,
@@ -511,20 +527,11 @@ class InvoiceViewModel: ObservableObject {
         )
     }
     
-    /// Calculates the total amount for selected items
-    var selectedItemsTotal: Decimal {
-        return selectedItems.reduce(Decimal(0)) { $0 + $1.amount }
-    }
-    
-    /// Clears all selected items
-    func clearSelectedItems() {
-        selectedItems.removeAll()
-    }
+    var selectedItemsTotal: Decimal { selectedItems.reduce(Decimal(0)) { $0 + $1.amount } }
+    func clearSelectedItems() { selectedItems.removeAll() }
 }
 
 // MARK: - Supporting Models
-
-/// Represents an item being added to a new invoice
 struct InvoiceItemCreation: Identifiable {
     let id: String
     let netSuiteItemId: String
@@ -534,11 +541,15 @@ struct InvoiceItemCreation: Identifiable {
     let unitPrice: Decimal
     let amount: Decimal
     
-    var formattedUnitPrice: String {
-        return String(format: "$%.2f", (unitPrice as NSDecimalNumber).doubleValue)
-    }
+    private static let formatter: NumberFormatter = {
+        let f = NumberFormatter(); f.numberStyle = .currency; f.locale = .current; return f
+    }()
     
-    var formattedAmount: String {
-        return String(format: "$%.2f", (amount as NSDecimalNumber).doubleValue)
+    var formattedUnitPrice: String {
+        Self.formatter.string(from: unitPrice as NSDecimalNumber) ?? "$0.00"
     }
-} 
+    var formattedAmount: String {
+        Self.formatter.string(from: amount as NSDecimalNumber) ?? "$0.00"
+    }
+}
+

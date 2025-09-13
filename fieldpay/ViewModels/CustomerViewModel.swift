@@ -1,8 +1,15 @@
 import Foundation
 import Combine
 
+// MARK: - CustomerViewModel Debug Configuration
+extension CustomerViewModel {
+    var debugLoggingEnabled: Bool {
+        return DebugLogConfig.shared.logErrorDetails
+    }
+}
+
 @MainActor
-class CustomerViewModel: ObservableObject {
+class CustomerViewModel: ObservableObject, CustomerManaging {
     @Published var customers: [Customer] = []
     @Published var selectedCustomer: Customer?
     @Published var isLoading = false
@@ -73,6 +80,12 @@ class CustomerViewModel: ObservableObject {
         customerInvoicesCache.removeAll()
     }
     
+    func initializeIfNeeded() async {
+        guard customers.isEmpty && !isLoading else { return }
+        if debugLoggingEnabled { print("Debug: CustomerViewModel - Initializing customers on first load") }
+        await loadNextPage()
+    }
+    
     func loadNextPage() async {
         guard !isLoading, hasMore else { return }
         isLoading = true
@@ -84,7 +97,7 @@ class CustomerViewModel: ObservableObject {
             let newCustomers = response.items.map { $0.toCustomer() }
             
             // Fetch detailed customer information for each customer to get proper names
-            print("Debug: CustomerViewModel - Loading detailed customer information for \(newCustomers.count) customers")
+            if debugLoggingEnabled { print("Debug: CustomerViewModel - Loading detailed customer information for \(newCustomers.count) customers") }
             let detailedCustomers = await fetchDetailedCustomers(for: newCustomers)
             
             // Cache detailed customer info
@@ -189,20 +202,56 @@ class CustomerViewModel: ObservableObject {
     private func loadCustomerData(customerId: String) async {
         print("Debug: CustomerViewModel - Loading all data for customer: \(customerId)")
         
-        // Load transactions, payments, and invoices concurrently
-        async let transactionsTask = loadCustomerTransactions(customerId: customerId)
-        async let paymentsTask = loadCustomerPayments(customerId: customerId)
-        
-        // Handle invoices separately since it can throw
+        // Use the new batch fetching method to prevent interference
         do {
-            async let invoicesTask = loadCustomerInvoices(customerId: customerId)
-            await (transactionsTask, paymentsTask, try invoicesTask)
+            let customerData = try await netSuiteAPI.fetchCustomerDataBatch(customerIds: [customerId])
+            if let data = customerData[customerId] {
+                await MainActor.run {
+                    self.customerInvoices = data.invoices
+                        .filter { !$0.id.isEmpty } // Filter out invoices with empty IDs
+                        .sorted { $0.createdDate > $1.createdDate }
+                    self.customerPayments = data.payments
+                        .filter { !$0.id.isEmpty } // Filter out payments with empty IDs
+                        .map { payment in
+                            CustomerPayment(
+                                id: payment.id,
+                                paymentNumber: payment.netSuitePaymentId ?? payment.id,
+                                date: payment.processedDate ?? payment.createdDate,
+                                amount: payment.amount,
+                                status: payment.status.rawValue,
+                                memo: payment.description,
+                                paymentMethod: payment.paymentMethod.rawValue
+                            )
+                        }.sorted { $0.date > $1.date }
+                    self.customerTransactions = data.transactions.map { $0.toCustomerTransaction() }
+                    
+                    // Update caches
+                    self.customerInvoicesCache[customerId] = self.customerInvoices
+                    self.customerPaymentsCache[customerId] = self.customerPayments
+                    self.customerTransactionsCache[customerId] = self.customerTransactions
+                    
+                    // Clear loading states
+                    self.isLoadingInvoices = false
+                    self.isLoadingPayments = false
+                    self.isLoadingTransactions = false
+                    
+                    print("Debug: CustomerViewModel - Successfully loaded all data for customer \(customerId)")
+                    print("Debug: CustomerViewModel - Loaded \(self.customerPayments.count) payments, \(self.customerInvoices.count) invoices, \(self.customerTransactions.count) transactions")
+                }
+            }
         } catch {
-            print("Debug: CustomerViewModel - Error loading invoices: \(error)")
-            await (transactionsTask, paymentsTask)
+            print("Debug: CustomerViewModel - Error loading customer data: \(error)")
+            await MainActor.run {
+                self.invoicesError = "Failed to load invoices: \(error.localizedDescription)"
+                self.paymentsError = "Failed to load payments: \(error.localizedDescription)"
+                self.transactionsError = "Failed to load transactions: \(error.localizedDescription)"
+                
+                // Clear loading states
+                self.isLoadingInvoices = false
+                self.isLoadingPayments = false
+                self.isLoadingTransactions = false
+            }
         }
-        
-        print("Debug: CustomerViewModel - Completed loading all data for customer: \(customerId)")
     }
     
     // MARK: - Cache Helper Methods
@@ -223,15 +272,12 @@ class CustomerViewModel: ObservableObject {
     // MARK: - Lazy Loading of Customer Detail Data
     
     func loadCustomerTransactions(customerId: String) async {
-        print("Debug: CustomerViewModel - Loading transactions for customer: \(customerId)")
-        
-        // Check cache first using helper
+        // Check cache first
         if await useCacheIfAvailable(
             cache: customerTransactionsCache, 
             key: customerId, 
             setPublished: { self.customerTransactions = $0 }
         ) {
-            print("Debug: CustomerViewModel - Using cached transactions: \(customerTransactions.count)")
             return
         }
         
@@ -241,20 +287,15 @@ class CustomerViewModel: ObservableObject {
         }
         
         do {
-            // Use the new dedicated SuiteQL method for customer transactions
-            print("Debug: CustomerViewModel - Fetching transactions via dedicated SuiteQL method...")
             let transactions = try await netSuiteAPI.fetchCustomerTransactions(for: customerId)
-            
-            print("Debug: CustomerViewModel - Found \(transactions.count) transactions via SuiteQL")
+            let customerTransactions = transactions.map { $0.toCustomerTransaction() }
             
             await MainActor.run {
-                self.customerTransactions = transactions
-                self.customerTransactionsCache[customerId] = transactions
+                self.customerTransactions = customerTransactions
+                self.customerTransactionsCache[customerId] = customerTransactions
                 self.isLoadingTransactions = false
-                print("Debug: CustomerViewModel - Successfully loaded \(transactions.count) transactions")
             }
         } catch {
-            print("Debug: CustomerViewModel - Error loading transactions: \(error)")
             await MainActor.run {
                 self.transactionsError = "Failed to load transactions: \(error.localizedDescription)"
                 self.customerTransactions = []
@@ -265,15 +306,12 @@ class CustomerViewModel: ObservableObject {
     }
     
     func loadCustomerPayments(customerId: String) async {
-        print("Debug: CustomerViewModel - Loading payments for customer: \(customerId)")
-        
-        // Check cache first using helper
+        // Check cache first
         if await useCacheIfAvailable(
             cache: customerPaymentsCache,
             key: customerId,
             setPublished: { self.customerPayments = $0 }
         ) {
-            print("Debug: CustomerViewModel - Using cached payments: \(customerPayments.count)")
             return
         }
         
@@ -283,41 +321,20 @@ class CustomerViewModel: ObservableObject {
         }
         
         do {
-            // Try to get payments from multiple sources
-            var allPayments: [CustomerPayment] = []
-            
-            // 1. Try to get payments from NetSuite via SuiteQL
-            do {
-                let suiteQLPayments = try await netSuiteAPI.fetchCustomerPayments(for: customerId)
-                let netSuitePayments = suiteQLPayments.map { $0.toCustomerPayment() }
-                allPayments.append(contentsOf: netSuitePayments)
-                print("Debug: CustomerViewModel - Found \(netSuitePayments.count) payments from NetSuite")
-            } catch {
-                print("Debug: CustomerViewModel - Failed to load NetSuite payments: \(error)")
-                // Continue with other payment sources
-            }
-            
-            // 2. Try to get local payments (Stripe payments that might not be in NetSuite yet)
-            do {
-                let localPayments = try await getLocalCustomerPayments(customerId: customerId)
-                allPayments.append(contentsOf: localPayments)
-                print("Debug: CustomerViewModel - Found \(localPayments.count) local payments")
-            } catch {
-                print("Debug: CustomerViewModel - Failed to load local payments: \(error)")
-            }
+            let netSuitePayments = try await netSuiteAPI.fetchCustomerPayments(for: customerId)
+            let payments = netSuitePayments
+                .filter { !$0.id.isEmpty } // Filter out payments with empty IDs
+                .map { $0.toCustomerPayment() }
             
             // Sort payments by date (most recent first)
-            allPayments.sort { $0.date > $1.date }
+            let sortedPayments = payments.sorted { $0.date > $1.date }
             
-            // Update UI state in a single MainActor call
             await MainActor.run {
-                self.customerPayments = allPayments
-                self.customerPaymentsCache[customerId] = allPayments
+                self.customerPayments = sortedPayments
+                self.customerPaymentsCache[customerId] = sortedPayments
                 self.isLoadingPayments = false
-                print("Debug: CustomerViewModel - Successfully loaded \(allPayments.count) total payments")
             }
         } catch {
-            print("Debug: CustomerViewModel - Error loading payments: \(error)")
             await MainActor.run {
                 self.paymentsError = "Failed to load payments: \(error.localizedDescription)"
                 self.customerPayments = []
@@ -327,64 +344,13 @@ class CustomerViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Local Payment Storage
-    
-    // In-memory storage for local payments (in a real app, this would be Core Data or a database)
-    private var localPayments: [String: [CustomerPayment]] = [:]
-    
-    /// Store a local payment (e.g., from Stripe) that hasn't been synced to NetSuite yet
-    func storeLocalPayment(_ payment: CustomerPayment, for customerId: String) {
-        print("Debug: CustomerViewModel - Storing local payment for customer \(customerId): \(payment.paymentNumber)")
-        
-        if localPayments[customerId] == nil {
-            localPayments[customerId] = []
-        }
-        localPayments[customerId]?.append(payment)
-        
-        // Clear cache for this customer so payments will be reloaded
-        customerPaymentsCache.removeValue(forKey: customerId)
-        
-        // If this customer is currently selected, refresh the payments immediately
-        if selectedCustomer?.id == customerId {
-            Task {
-                await loadCustomerPayments(customerId: customerId)
-            }
-        }
-        
-        print("Debug: CustomerViewModel - Local payments for customer \(customerId): \(localPayments[customerId]?.count ?? 0)")
-    }
-    
-    /// Get local payments (Stripe payments that might not be synced to NetSuite yet)
-    private func getLocalCustomerPayments(customerId: String) async throws -> [CustomerPayment] {
-        print("Debug: CustomerViewModel - Getting local payments for customer: \(customerId)")
-        
-        let payments = localPayments[customerId] ?? []
-        print("Debug: CustomerViewModel - Found \(payments.count) local payments for customer \(customerId)")
-        
-        return payments
-    }
-    
-    /// Force refresh customer payments (clears cache and reloads)
-    func refreshCustomerPayments(customerId: String) async {
-        print("Debug: CustomerViewModel - Force refreshing payments for customer: \(customerId)")
-        
-        // Clear cache
-        customerPaymentsCache.removeValue(forKey: customerId)
-        
-        // Reload payments
-        await loadCustomerPayments(customerId: customerId)
-    }
-    
     func loadCustomerInvoices(customerId: String) async throws {
-        print("Debug: CustomerViewModel - Loading invoices for customer: \(customerId)")
-        
-        // Check cache first using helper
+        // Check cache first
         if await useCacheIfAvailable(
             cache: customerInvoicesCache,
             key: customerId,
             setPublished: { self.customerInvoices = $0 }
         ) {
-            print("Debug: CustomerViewModel - Using cached invoices: \(customerInvoices.count)")
             return
         }
         
@@ -394,23 +360,19 @@ class CustomerViewModel: ObservableObject {
         }
         
         do {
-            // Use the new dedicated SuiteQL method for customer invoices
-            print("Debug: CustomerViewModel - Fetching invoices via dedicated SuiteQL method...")
-            let suiteQLInvoices = try await netSuiteAPI.fetchCustomerInvoices(for: customerId)
+            let invoices = try await netSuiteAPI.fetchCustomerInvoices(for: customerId)
             
-            // Convert SuiteQL records to our app's Invoice models
-            let invoices = suiteQLInvoices.map { $0.toInvoice() }
-            
-            print("Debug: CustomerViewModel - Found \(invoices.count) invoices via SuiteQL")
+            // Filter out invoices with empty IDs and sort by date (most recent first)
+            let sortedInvoices = invoices
+                .filter { !$0.id.isEmpty }
+                .sorted { $0.createdDate > $1.createdDate }
             
             await MainActor.run {
-                self.customerInvoices = invoices
-                self.customerInvoicesCache[customerId] = invoices
+                self.customerInvoices = sortedInvoices
+                self.customerInvoicesCache[customerId] = sortedInvoices
                 self.isLoadingInvoices = false
-                print("Debug: CustomerViewModel - Successfully loaded \(invoices.count) invoices")
             }
         } catch {
-            print("Debug: CustomerViewModel - Error loading invoices: \(error)")
             await MainActor.run {
                 self.invoicesError = "Failed to load invoices: \(error.localizedDescription)"
                 self.customerInvoices = []
@@ -418,85 +380,6 @@ class CustomerViewModel: ObservableObject {
                 self.isLoadingInvoices = false
             }
         }
-    }
-    
-    // MARK: - Helper Methods
-    
-    /// Get customer payment history from NetSuite via SuiteQL
-    private func getCustomerPaymentHistory(customerId: String) async throws -> [CustomerPayment] {
-        print("Debug: CustomerViewModel - Getting payment history for customer: \(customerId)")
-        
-        // Sanitize customerId to prevent SQL injection
-        let sanitizedCustomerId = customerId.replacingOccurrences(of: "'", with: "''")
-        
-        let query = """
-        SELECT 
-            t.id,
-            t.tranid,
-            t.trandate,
-            t.payment,
-            t.status,
-            t.memo,
-            t.entity,
-            t.paymentmethod
-        FROM transaction t
-        WHERE t.entity = '\(sanitizedCustomerId)' AND t.type = 'CustPymt'
-        ORDER BY t.trandate DESC
-        """
-        
-        print("Debug: CustomerViewModel - Executing SuiteQL query: \(query)")
-        
-        let resource = NetSuiteResource.suiteQL(query: query)
-        let response: SuiteQLResponse = try await netSuiteAPI.fetch(resource, type: SuiteQLResponse.self)
-        
-        print("Debug: CustomerViewModel - SuiteQL response received: \(response.items.count) items")
-        
-        var payments: [CustomerPayment] = []
-        for (index, item) in response.items.enumerated() {
-            print("Debug: CustomerViewModel - Processing payment item \(index + 1): \(item.values)")
-            
-            if let id = item.values["id"],
-               let tranId = item.values["tranid"],
-               let trandate = item.values["trandate"],
-               let totalStr = item.values["payment"],
-               let status = item.values["status"] {
-                
-                let total = Double(totalStr) ?? 0.0
-                let date = parseDate(trandate) ?? Date()
-                
-                let payment = CustomerPayment(
-                    id: id,
-                    paymentNumber: tranId,
-                    date: date,
-                    amount: Decimal(total),
-                    status: status,
-                    memo: item.values["memo"],
-                    paymentMethod: item.values["paymentmethod"]
-                )
-                payments.append(payment)
-                print("Debug: CustomerViewModel - Successfully created payment: \(tranId) - $\(total)")
-            } else {
-                print("Debug: CustomerViewModel - Skipping payment item \(index + 1) - missing required fields")
-                print("Debug: CustomerViewModel - Available fields: \(item.values.keys)")
-            }
-        }
-        
-        print("Debug: CustomerViewModel - Successfully processed \(payments.count) payments from \(response.items.count) items")
-        return payments
-    }
-    
-    private func parseDate(_ dateString: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
-        formatter.timeZone = TimeZone(abbreviation: "UTC")
-        
-        if let date = formatter.date(from: dateString) {
-            return date
-        }
-        
-        // Try alternative format
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: dateString)
     }
     
     // MARK: - Search and Filter
@@ -552,7 +435,11 @@ class CustomerViewModel: ObservableObject {
             let suiteQLQuery = """
                 SELECT id, entityid, companyname, email, phone, isinactive 
                 FROM customer 
-                WHERE (entityid ILIKE '%\(sanitizedQuery)%' OR companyname ILIKE '%\(sanitizedQuery)%' OR email ILIKE '%\(sanitizedQuery)%')
+                WHERE (
+                    UPPER(entityid) LIKE UPPER('%\(sanitizedQuery)%') OR 
+                    UPPER(companyname) LIKE UPPER('%\(sanitizedQuery)%') OR 
+                    UPPER(email) LIKE UPPER('%\(sanitizedQuery)%')
+                )
                 AND isinactive = 'F'
                 ORDER BY companyname
                 """
@@ -626,6 +513,19 @@ class CustomerViewModel: ObservableObject {
     func getCustomersByStatus(isActive: Bool) -> [Customer] {
         return customers.filter { $0.isActive == isActive }
     }
+    
+    // MARK: - CustomerManaging Protocol Compliance
+    
+    @MainActor func storeLocalPayment(_ payment: CustomerPayment, for customerId: String) {
+        // Implementation for storing local payments
+        // This method is required by the CustomerManaging protocol
+        if debugLoggingEnabled {
+            print("Debug: CustomerViewModel - Storing local payment for customer \(customerId)")
+        }
+        // TODO: Implement local payment storage if needed
+    }
+    
+
 }
 
  

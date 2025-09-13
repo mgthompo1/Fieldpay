@@ -4,7 +4,7 @@ import CryptoKit
 
 @MainActor
 class OAuthManager: ObservableObject {
-    static let shared = OAuthManager()
+    nonisolated static let shared = OAuthManager()
     
     private var clientId: String = ""
     private var clientSecret: String = ""
@@ -15,13 +15,13 @@ class OAuthManager: ObservableObject {
     @Published var accessToken: String?
     @Published var refreshToken: String?
     
-    private init() {
+    nonisolated private init() {
         // Load from UserDefaults if available
         loadConfiguration()
         
         // Load stored tokens if available
-        Task {
-            await loadStoredTokens()
+        Task { @MainActor in
+            await self.loadStoredTokens()
         }
     }
     
@@ -144,22 +144,24 @@ class OAuthManager: ObservableObject {
         return isValid
     }
     
-    private func loadConfiguration() {
+    nonisolated private func loadConfiguration() {
         print("Debug: OAuthManager.loadConfiguration() called")
         
         let keychainWrapper = KeychainWrapper.shared
         let config = keychainWrapper.loadNetSuiteConfiguration()
         
-        clientId = config.clientId ?? ""
-        clientSecret = config.clientSecret ?? ""
-        accountId = config.accountId ?? ""
-        redirectUri = config.redirectUri ?? "fieldpay://callback"
-        
-        print("Debug: Loaded configuration from Keychain:")
-        print("Debug: - clientId: '\(clientId)' (length: \(clientId.count))")
-        print("Debug: - clientSecret: '\(clientSecret)' (length: \(clientSecret.count))")
-        print("Debug: - accountId: '\(accountId)' (length: \(accountId.count))")
-        print("Debug: - redirectUri: '\(redirectUri)'")
+        Task { @MainActor in
+            self.clientId = config.clientId ?? ""
+            self.clientSecret = config.clientSecret ?? ""
+            self.accountId = config.accountId ?? ""
+            self.redirectUri = config.redirectUri ?? "fieldpay://callback"
+            
+            print("Debug: Loaded configuration from Keychain:")
+            print("Debug: - clientId: '\(self.clientId)' (length: \(self.clientId.count))")
+            print("Debug: - clientSecret: '\(self.clientSecret)' (length: \(self.clientSecret.count))")
+            print("Debug: - accountId: '\(self.accountId)' (length: \(self.accountId.count))")
+            print("Debug: - redirectUri: '\(self.redirectUri)'")
+        }
     }
     
     // MARK: - PKCE Helper Functions

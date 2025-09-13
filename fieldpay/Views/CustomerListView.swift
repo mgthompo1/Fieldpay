@@ -1,5 +1,18 @@
 import SwiftUI
 
+// MARK: - Debug Configuration Extensions
+extension CustomerListView {
+    var debugLoggingEnabled: Bool {
+        return DebugLogConfig.shared.logErrorDetails
+    }
+}
+
+extension CustomerDetailView {
+    var debugLoggingEnabled: Bool {
+        return DebugLogConfig.shared.logErrorDetails
+    }
+}
+
 // MARK: - Customer Filter Enum
 enum CustomerFilter: String, CaseIterable {
     case all = "All"
@@ -15,36 +28,36 @@ enum CustomerFilter: String, CaseIterable {
     }
 }
 
+// MARK: - Active Sheet Enum
+enum CustomerActiveSheet: Identifiable {
+    case addCustomer
+    case editCustomer(Customer)
+    case createInvoice(Customer)
+    case processPayment(Customer)
+    case customerHistory(Customer)
+    
+    var id: String {
+        switch self {
+        case .addCustomer: return "add"
+        case .editCustomer: return "edit"
+        case .createInvoice: return "invoice"
+        case .processPayment: return "payment"
+        case .customerHistory: return "history"
+        }
+    }
+}
+
 struct CustomerListView: View {
     @ObservedObject var viewModel: CustomerViewModel
     @State private var searchText = ""
-    @State private var showingAddCustomer = false
+    @State private var activeSheet: CustomerActiveSheet?
     @State private var selectedFilter: CustomerFilter = .all
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
-                // Header with Search and Filters
+                // Filter Pills Header
                 VStack(spacing: 16) {
-                    // Search Bar
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                        
-                        TextField("Search customers...", text: $searchText)
-                            .textFieldStyle(PlainTextFieldStyle())
-                        
-                        if !searchText.isEmpty {
-                            Button(action: { searchText = "" }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    .padding(16)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    
                     // Filter Pills
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
@@ -91,57 +104,57 @@ struct CustomerListView: View {
                     ScrollView {
                         LazyVStack(spacing: 16) {
                             ForEach(filteredCustomers) { customer in
-                                NavigationLink(destination: CustomerDetailView(customer: customer, viewModel: viewModel)) {
+                                NavigationLink(destination: CustomerDetailView(customer: customer, viewModel: viewModel, activeSheet: $activeSheet)) {
                                     ModernCustomerCard(customer: customer)
                                 }
                                 .buttonStyle(PlainButtonStyle())
-                                .onTapGesture {
-                                    print("Debug: CustomerListView - Tapped customer: \(customer.name) (ID: \(customer.id))")
-                                }
                             }
                             
-                            // Load more button
-                            if viewModel.hasMore && !viewModel.isLoading {
-                                Button(action: {
-                                    Task {
-                                        await viewModel.loadNextPage()
+                            // Auto-load more items when scrolling to bottom
+                            if viewModel.hasMore {
+                                ProgressView()
+                                    .onAppear {
+                                        Task {
+                                            await viewModel.loadNextPage()
+                                        }
                                     }
-                                }) {
-                                    HStack {
-                                        Image(systemName: "arrow.down.circle")
-                                        Text("Load More Customers")
-                                    }
-                                    .foregroundColor(.blue)
-                                    .padding()
-                                }
                             }
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 20)
                     }
+                    .refreshable {
+                        viewModel.resetPagination()
+                        await viewModel.loadNextPage()
+                    }
                 }
             }
             .navigationTitle("Customers")
             .navigationBarTitleDisplayMode(.large)
+            .searchable(text: $searchText, prompt: "Search customers...")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddCustomer = true }) {
+                    Button(action: { activeSheet = .addCustomer }) {
                         Image(systemName: "plus")
                     }
                 }
             }
-            .sheet(isPresented: $showingAddCustomer) {
-                // Add customer sheet would go here
-                Text("Add Customer")
-            }
-            .onAppear {
-                // Automatically load customers when the view appears if not already loaded
-                if viewModel.customers.isEmpty && !viewModel.isLoading {
-                    print("Debug: CustomerListView - View appeared, loading customers automatically")
-                    Task {
-                        await viewModel.loadNextPage()
-                    }
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .addCustomer:
+                    AddCustomerView(viewModel: viewModel)
+                case .editCustomer(let customer):
+                    EditCustomerView(customer: customer, viewModel: viewModel)
+                case .createInvoice(let customer):
+                    CreateInvoiceView(customer: customer)
+                case .processPayment:
+                    Text("Process Payment - Under Construction")
+                case .customerHistory(let customer):
+                    CustomerHistoryView(customer: customer, viewModel: viewModel)
                 }
+            }
+            .task {
+                await viewModel.initializeIfNeeded()
             }
         }
     }
@@ -311,18 +324,17 @@ struct CustomerRowView: View {
 struct CustomerDetailView: View {
     let customer: Customer
     @ObservedObject var viewModel: CustomerViewModel
-    @State private var showingEditCustomer = false
+    @Binding var activeSheet: CustomerActiveSheet?
     @State private var selectedTab = 0
     
-    // Navigation state for quick actions
-    @State private var showingCreateInvoice = false
-    @State private var showingProcessPayment = false
-    @State private var showingCustomerHistory = false
-    
-    init(customer: Customer, viewModel: CustomerViewModel) {
+    init(customer: Customer, viewModel: CustomerViewModel, activeSheet: Binding<CustomerActiveSheet?>) {
         self.customer = customer
         self.viewModel = viewModel
-        print("Debug: CustomerDetailView - Initialized with customer: \(customer.name) (ID: \(customer.id))")
+        self._activeSheet = activeSheet
+        // Reduce noisy duplicate init logs in production builds
+        #if DEBUG
+                                        if debugLoggingEnabled { print("Debug: CustomerDetailView - Initialized with customer: \(customer.name) (ID: \(customer.id))") }
+        #endif
     }
     
     var body: some View {
@@ -346,7 +358,7 @@ struct CustomerDetailView: View {
                         Spacer()
                         
                         Button("Edit") {
-                            showingEditCustomer = true
+                            activeSheet = .editCustomer(customer)
                         }
                         .buttonStyle(.bordered)
                     }
@@ -438,7 +450,7 @@ struct CustomerDetailView: View {
                             gradient: LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing)
                         ) {
                             print("Debug: CustomerDetailView - Create Invoice tapped for customer: \(customer.name)")
-                            showingCreateInvoice = true
+                            activeSheet = .createInvoice(customer)
                         }
                         
                         ModernQuickActionButton(
@@ -449,7 +461,7 @@ struct CustomerDetailView: View {
                             gradient: LinearGradient(colors: [.green, .mint], startPoint: .leading, endPoint: .trailing)
                         ) {
                             print("Debug: CustomerDetailView - Process Payment tapped for customer: \(customer.name)")
-                            showingProcessPayment = true
+                            activeSheet = .processPayment(customer)
                         }
                         
                         ModernQuickActionButton(
@@ -460,7 +472,7 @@ struct CustomerDetailView: View {
                             gradient: LinearGradient(colors: [.orange, .yellow], startPoint: .leading, endPoint: .trailing)
                         ) {
                             print("Debug: CustomerDetailView - View History tapped for customer: \(customer.name)")
-                            showingCustomerHistory = true
+                            activeSheet = .customerHistory(customer)
                         }
                     }
                 }
@@ -515,26 +527,12 @@ struct CustomerDetailView: View {
         }
         .navigationTitle("Customer Details")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingEditCustomer) {
-            EditCustomerView(customer: customer, viewModel: viewModel)
-        }
-        .sheet(isPresented: $showingCreateInvoice) {
-            CreateInvoiceView(customer: customer)
-        }
-        .sheet(isPresented: $showingProcessPayment) {
-            ProcessPaymentView(customer: customer)
-        }
-        .sheet(isPresented: $showingCustomerHistory) {
-            CustomerHistoryView(customer: customer, viewModel: viewModel)
-        }
-        .onAppear {
+        .task {
             print("Debug: CustomerDetailView - View appeared for customer: \(customer.name) (ID: \(customer.id))")
             print("Debug: CustomerDetailView - Customer details: name=\(customer.name), email=\(customer.email ?? "nil"), phone=\(customer.phone ?? "nil"), company=\(customer.companyName ?? "nil")")
             
             // Load customer detail data (transactions, payments, invoices) when view appears
-            Task {
-                await viewModel.loadCustomerDetail(id: customer.id)
-            }
+            await viewModel.loadCustomerDetail(id: customer.id)
         }
     }
 }
@@ -554,46 +552,44 @@ struct AddCustomerView: View {
     @State private var country = ""
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section("Basic Information") {
-                    TextField("Name", text: $name)
-                    TextField("Email", text: $email)
-                        .keyboardType(.emailAddress)
-                    TextField("Phone", text: $phone)
-                        .keyboardType(.phonePad)
-                    TextField("Company Name", text: $companyName)
-                }
-                
-                Section("Address") {
-                    TextField("Street", text: $street)
-                    TextField("City", text: $city)
-                    TextField("State", text: $state)
-                    TextField("ZIP Code", text: $zipCode)
-                    TextField("Country", text: $country)
+        Form {
+            Section("Basic Information") {
+                TextField("Name", text: $name)
+                TextField("Email", text: $email)
+                    .keyboardType(.emailAddress)
+                TextField("Phone", text: $phone)
+                    .keyboardType(.phonePad)
+                TextField("Company Name", text: $companyName)
+            }
+            
+            Section("Address") {
+                TextField("Street", text: $street)
+                TextField("City", text: $city)
+                TextField("State", text: $state)
+                TextField("ZIP Code", text: $zipCode)
+                TextField("Country", text: $country)
+            }
+        }
+        .navigationTitle("Add Customer")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    dismiss()
                 }
             }
-            .navigationTitle("Add Customer")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Save") {
+                    viewModel.createCustomer(
+                        name: name,
+                        email: email.isEmpty ? nil : email,
+                        phone: phone.isEmpty ? nil : phone,
+                        companyName: companyName.isEmpty ? nil : companyName
+                    )
+                    dismiss()
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        viewModel.createCustomer(
-                            name: name,
-                            email: email.isEmpty ? nil : email,
-                            phone: phone.isEmpty ? nil : phone,
-                            companyName: companyName.isEmpty ? nil : companyName
-                        )
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty)
-                }
+                .disabled(name.isEmpty)
             }
         }
     }
@@ -630,62 +626,60 @@ struct EditCustomerView: View {
     }
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section("Basic Information") {
-                    TextField("Name", text: $name)
-                    TextField("Email", text: $email)
-                        .keyboardType(.emailAddress)
-                    TextField("Phone", text: $phone)
-                        .keyboardType(.phonePad)
-                    TextField("Company Name", text: $companyName)
-                }
-                
-                Section("Address") {
-                    TextField("Street", text: $street)
-                    TextField("City", text: $city)
-                    TextField("State", text: $state)
-                    TextField("ZIP Code", text: $zipCode)
-                    TextField("Country", text: $country)
+        Form {
+            Section("Basic Information") {
+                TextField("Name", text: $name)
+                TextField("Email", text: $email)
+                    .keyboardType(.emailAddress)
+                TextField("Phone", text: $phone)
+                    .keyboardType(.phonePad)
+                TextField("Company Name", text: $companyName)
+            }
+            
+            Section("Address") {
+                TextField("Street", text: $street)
+                TextField("City", text: $city)
+                TextField("State", text: $state)
+                TextField("ZIP Code", text: $zipCode)
+                TextField("Country", text: $country)
+            }
+        }
+        .navigationTitle("Edit Customer")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    dismiss()
                 }
             }
-            .navigationTitle("Edit Customer")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Save") {
+                    let address = Customer.Address(
+                        street: street.isEmpty ? nil : street,
+                        city: city.isEmpty ? nil : city,
+                        state: state.isEmpty ? nil : state,
+                        zipCode: zipCode.isEmpty ? nil : zipCode,
+                        country: country.isEmpty ? nil : country
+                    )
+                    
+                    let updatedCustomer = Customer(
+                        id: customer.id,
+                        name: name,
+                        email: email.isEmpty ? nil : email,
+                        phone: phone.isEmpty ? nil : phone,
+                        address: address,
+                        netSuiteId: customer.netSuiteId,
+                        companyName: companyName.isEmpty ? nil : companyName,
+                        isActive: customer.isActive,
+                        createdDate: customer.createdDate,
+                        lastModifiedDate: Date()
+                    )
+                    
+                    viewModel.updateCustomer(updatedCustomer)
+                    dismiss()
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        let address = Customer.Address(
-                            street: street.isEmpty ? nil : street,
-                            city: city.isEmpty ? nil : city,
-                            state: state.isEmpty ? nil : state,
-                            zipCode: zipCode.isEmpty ? nil : zipCode,
-                            country: country.isEmpty ? nil : country
-                        )
-                        
-                        let updatedCustomer = Customer(
-                            id: customer.id,
-                            name: name,
-                            email: email.isEmpty ? nil : email,
-                            phone: phone.isEmpty ? nil : phone,
-                            address: address,
-                            netSuiteId: customer.netSuiteId,
-                            companyName: companyName.isEmpty ? nil : companyName,
-                            isActive: customer.isActive,
-                            createdDate: customer.createdDate,
-                            lastModifiedDate: Date()
-                        )
-                        
-                        viewModel.updateCustomer(updatedCustomer)
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty)
-                }
+                .disabled(name.isEmpty)
             }
         }
     }
@@ -1208,7 +1202,7 @@ struct InvoiceDetailCard: View {
 }
 
 struct InvoiceLineItemRow: View {
-    let item: Invoice.InvoiceItem
+    let item: AppInvoiceItem
     
     var body: some View {
         HStack(spacing: 12) {
@@ -1273,16 +1267,15 @@ struct CreateInvoiceView: View {
     @StateObject private var viewModel = CreateInvoiceViewModel()
     
     var body: some View {
-        NavigationView {
-            Form {
-                // Customer Information Section
-                Section("Customer Information") {
-                    HStack {
-                        Text("Customer")
-                        Spacer()
-                        Text(customer.name)
-                            .foregroundColor(.secondary)
-                    }
+        Form {
+            // Customer Information Section
+            Section("Customer Information") {
+                HStack {
+                    Text("Customer")
+                    Spacer()
+                    Text(customer.name)
+                        .foregroundColor(.secondary)
+                }
                     
                     if let companyName = customer.companyName {
                         HStack {
@@ -1442,12 +1435,9 @@ struct CreateInvoiceView: View {
                     }
                 )
             }
-            .onAppear {
-                Task {
-                    await viewModel.loadData()
-                }
+            .task {
+                await viewModel.loadData()
             }
-        }
     }
 }
 
@@ -1467,7 +1457,7 @@ class CreateInvoiceViewModel: ObservableObject {
     @Published var selectedLocation: NetSuiteLocation?
     @Published var isLoadingLocations = false
     
-    @Published var inventoryItems: [NetSuiteInventoryItem] = []
+    @Published var inventoryItems: [NetSuiteItem] = []
     @Published var isLoadingInventory = false
     
     @Published var lineItems: [InvoiceLineItem] = []
@@ -1543,13 +1533,13 @@ class CreateInvoiceViewModel: ObservableObject {
         isLoadingInventory = false
     }
     
-    func addLineItem(_ inventoryItem: NetSuiteInventoryItem) {
+    func addLineItem(_ inventoryItem: NetSuiteItem) {
         let lineItem = InvoiceLineItem(
             item: inventoryItem,
             quantity: 1.0,
-            rate: inventoryItem.basePrice ?? 0.0,
-            amount: inventoryItem.basePrice ?? 0.0,
-            description: inventoryItem.description ?? inventoryItem.displayName ?? "Unknown Item",
+            rate: inventoryItem.basePrice,
+            amount: inventoryItem.basePrice,
+            description: inventoryItem.description ?? inventoryItem.displayName,
             lineNumber: lineItems.count + 1
         )
         lineItems.append(lineItem)
@@ -1565,7 +1555,7 @@ class CreateInvoiceViewModel: ObservableObject {
             // Create line items for the request
             let requestLineItems = lineItems.map { lineItem in
                 NetSuiteInvoiceLineItem(
-                    item: lineItem.item,
+                    item: EntityReference(id: lineItem.item.id, refName: lineItem.item.displayName, type: nil),
                     quantity: lineItem.quantity,
                     rate: lineItem.rate,
                     amount: lineItem.amount,
@@ -1576,14 +1566,13 @@ class CreateInvoiceViewModel: ObservableObject {
             
             // Create the invoice request
             let request = NetSuiteInvoiceCreationRequest(
-                entity: NetSuiteEntityReference(id: customer.id, refName: customer.name),
+                entity: EntityReference(id: customer.id, refName: customer.name, type: nil),
                 tranDate: formatDate(transactionDate),
-                dueDate: formatDate(dueDate),
                 memo: memo.isEmpty ? nil : memo,
+                itemList: NetSuiteInvoiceItemList(item: requestLineItems),
                 customForm: selectedTemplate?.customForm,
                 location: selectedLocation.map { NetSuiteLocationReference(id: $0.id, refName: $0.name, type: nil) },
-                subsidiary: nil,
-                item: requestLineItems
+                subsidiary: nil
             )
             
             let createdInvoice = try await netSuiteAPI.createInvoice(request: request)
@@ -1609,7 +1598,7 @@ class CreateInvoiceViewModel: ObservableObject {
 // MARK: - Supporting Models and Views
 struct InvoiceLineItem: Identifiable {
     let id = UUID()
-    var item: NetSuiteInventoryItem
+    var item: NetSuiteItem
     var quantity: Double
     var rate: Double
     var amount: Double
@@ -1666,26 +1655,25 @@ struct LineItemRow: View {
 }
 
 struct AddLineItemView: View {
-    let inventoryItems: [NetSuiteInventoryItem]
-    let onAddItem: (NetSuiteInventoryItem) -> Void
+    let inventoryItems: [NetSuiteItem]
+    let onAddItem: (NetSuiteItem) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     
-    var filteredItems: [NetSuiteInventoryItem] {
+    var filteredItems: [NetSuiteItem] {
         if searchText.isEmpty {
             return inventoryItems
         } else {
             return inventoryItems.filter { item in
-                (item.displayName?.localizedCaseInsensitiveContains(searchText) == true) ||
+                (item.displayName.localizedCaseInsensitiveContains(searchText) == true) ||
                 (item.description?.localizedCaseInsensitiveContains(searchText) == true) ||
-                (item.itemId?.localizedCaseInsensitiveContains(searchText) == true)
+                (item.itemId.localizedCaseInsensitiveContains(searchText) == true)
             }
         }
     }
     
     var body: some View {
-        NavigationView {
-            VStack {
+        VStack {
                 // Search Bar
                 HStack {
                     Image(systemName: "magnifyingglass")
@@ -1713,7 +1701,7 @@ struct AddLineItemView: View {
                         dismiss()
                     }) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(item.displayName ?? "Unknown Item")
+                            Text(item.displayName)
                                 .font(.headline)
                             
                             if let description = item.description {
@@ -1723,19 +1711,15 @@ struct AddLineItemView: View {
                             }
                             
                             HStack {
-                                if let itemId = item.itemId {
-                                    Text("ID: \(itemId)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+                                Text("ID: \(item.itemId)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                                 
                                 Spacer()
                                 
-                                if let price = item.basePrice {
-                                    Text("$\(price, specifier: "%.2f")")
-                                        .font(.headline)
-                                        .foregroundColor(.blue)
-                                }
+                                Text("$\(item.basePrice, specifier: "%.2f")")
+                                    .font(.headline)
+                                    .foregroundColor(.blue)
                             }
                         }
                         .padding(.vertical, 4)
@@ -1752,10 +1736,11 @@ struct AddLineItemView: View {
                     }
                 }
             }
-        }
     }
 }
 
+// TEMPORARILY COMMENTED OUT FOR DEBUGGING
+/*
 struct ProcessPaymentView: View {
     let customer: Customer
     @Environment(\.dismiss) private var dismiss
@@ -1769,53 +1754,52 @@ struct ProcessPaymentView: View {
     let paymentMethods = ["Credit Card", "Cash", "Check", "Bank Transfer", "Tap to Pay"]
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section("Customer Information") {
+        Form {
+            Section("Customer Information") {
+                HStack {
+                    Text("Customer")
+                    Spacer()
+                    Text(customer.name)
+                        .foregroundColor(.secondary)
+                }
+                
+                if let companyName = customer.companyName {
                     HStack {
-                        Text("Customer")
+                        Text("Company")
                         Spacer()
-                        Text(customer.name)
+                        Text(companyName)
                             .foregroundColor(.secondary)
-                    }
-                    
-                    if let companyName = customer.companyName {
-                        HStack {
-                            Text("Company")
-                            Spacer()
-                            Text(companyName)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                
-                Section("Payment Details") {
-                    TextField("Payment Amount", text: $paymentAmount)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .keyboardType(.decimalPad)
-                    
-                    Picker("Payment Method", selection: $paymentMethod) {
-                        ForEach(paymentMethods, id: \.self) { method in
-                            Text(method).tag(method)
-                        }
-                    }
-                    
-                    TextField("Reference Number", text: $referenceNumber)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
-                    TextField("Notes", text: $notes, axis: .vertical)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .lineLimit(3...6)
-                }
-                
-                if let errorMessage = errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
                     }
                 }
             }
-            .navigationTitle("Process Payment")
+            
+            Section("Payment Details") {
+                TextField("Payment Amount", text: $paymentAmount)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .keyboardType(.decimalPad)
+                
+                Picker("Payment Method", selection: $paymentMethod) {
+                    ForEach(paymentMethods, id: \.self) { method in
+                        Text(method).tag(method)
+                    }
+                }
+                
+                TextField("Reference Number", text: $referenceNumber)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                
+                TextField("Notes", text: $notes, axis: .vertical)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .lineLimit(3...6)
+            }
+            
+            if let errorMessage = errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .navigationTitle("Process Payment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -1831,7 +1815,6 @@ struct ProcessPaymentView: View {
                     .disabled(paymentAmount.isEmpty || isLoading)
                 }
             }
-        }
     }
     
     private func processPayment() {
@@ -1854,8 +1837,8 @@ struct ProcessPaymentView: View {
         }
     }
 }
-
-
+*/
+// END COMMENT BLOCK
 
 struct CustomerHistoryView: View {
     let customer: Customer
@@ -1864,65 +1847,63 @@ struct CustomerHistoryView: View {
     @State private var selectedTab = 0
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Tab Picker
-                Picker("History Type", selection: $selectedTab) {
-                    Text("Invoices").tag(0)
-                    Text("Payments").tag(1)
-                    Text("Transactions").tag(2)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
-                
-                // Tab Content
-                TabView(selection: $selectedTab) {
-                    InvoicesTabView(
-                        invoices: viewModel.customerInvoices,
-                        isLoading: viewModel.isLoadingInvoices,
-                        errorMessage: viewModel.errorMessage
-                    )
-                    .tag(0)
-                    
-                    PaymentsTabView(
-                        payments: viewModel.customerPayments,
-                        isLoading: viewModel.isLoadingPayments,
-                        errorMessage: viewModel.errorMessage
-                    )
-                    .tag(1)
-                    
-                    TransactionsTabView(
-                        transactions: viewModel.customerTransactions,
-                        isLoading: viewModel.isLoadingTransactions,
-                        errorMessage: viewModel.errorMessage
-                    )
-                    .tag(2)
-                }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+        VStack(spacing: 0) {
+            // Tab Picker
+            Picker("History Type", selection: $selectedTab) {
+                Text("Invoices").tag(0)
+                Text("Payments").tag(1)
+                Text("Transactions").tag(2)
             }
-            .navigationTitle("Customer History")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        Task {
-                            await viewModel.refreshCustomerPayments(customerId: customer.id)
-                        }
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
+            .pickerStyle(SegmentedPickerStyle())
+            .padding()
+            
+            // Tab Content
+            TabView(selection: $selectedTab) {
+                InvoicesTabView(
+                    invoices: viewModel.customerInvoices,
+                    isLoading: viewModel.isLoadingInvoices,
+                    errorMessage: viewModel.errorMessage
+                )
+                .tag(0)
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                PaymentsTabView(
+                    payments: viewModel.customerPayments,
+                    isLoading: viewModel.isLoadingPayments,
+                    errorMessage: viewModel.errorMessage
+                )
+                .tag(1)
+                
+                TransactionsTabView(
+                    transactions: viewModel.customerTransactions,
+                    isLoading: viewModel.isLoadingTransactions,
+                    errorMessage: viewModel.errorMessage
+                )
+                .tag(2)
+            }
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+        }
+        .navigationTitle("Customer History")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    Task {
+                        await viewModel.loadCustomerPayments(customerId: customer.id)
                     }
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
                 }
             }
         }
     }
     
-    private func statusColor(for status: Invoice.InvoiceStatus) -> Color {
+    private func statusColor(for status: AppInvoiceStatus) -> Color {
         switch status {
         case .paid:
             return .green

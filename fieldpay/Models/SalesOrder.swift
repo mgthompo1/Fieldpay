@@ -11,7 +11,7 @@ struct SalesOrder: Identifiable, Codable {
     let orderDate: Date
     let expectedShipDate: Date?
     let netSuiteId: String?
-    let items: [SalesOrderItem]
+    var items: [SalesOrderItem]
     let notes: String?
     
     enum SalesOrderStatus: String, Codable, CaseIterable {

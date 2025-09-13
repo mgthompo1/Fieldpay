@@ -1,6 +1,22 @@
 import Foundation
 import Combine
 
+// MARK: - Windcave Types
+
+struct WindcaveSession: Codable {
+    let sessionId: String
+    let status: String
+    let url: String?
+}
+
+struct WindcaveTransaction: Codable {
+    let transactionId: String
+    let status: String
+    let amount: String
+    let currency: String
+    let merchantReference: String
+}
+
 class WindcaveManager: ObservableObject {
     static let shared = WindcaveManager()
     
@@ -431,4 +447,20 @@ enum WindcaveError: Error, LocalizedError {
             return "Tap to Pay session has expired."
         }
     }
-} 
+}
+
+// MARK: - WindcaveManaging Protocol Conformance
+
+extension WindcaveManager {
+    func createSession(amount: Double, currency: String, merchantReference: String) async throws -> WindcaveSession {
+        // Implementation for creating a Windcave session
+        // This would typically make an API call to Windcave
+        throw WindcaveError.notConfigured
+    }
+    
+    func getTransactionStatus(transactionId: String) async throws -> WindcaveTransaction {
+        // Implementation for getting transaction status
+        // This would typically make an API call to Windcave
+        throw WindcaveError.notConfigured
+    }
+}

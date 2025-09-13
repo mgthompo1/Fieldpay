@@ -84,7 +84,7 @@ struct InvoiceCustomerPickerView: View {
                 await loadCustomers()
             }
         }
-        .onChange(of: searchText) { _ in
+        .onChange(of: searchText) {
             Task {
                 await loadCustomers(searchQuery: searchText)
             }

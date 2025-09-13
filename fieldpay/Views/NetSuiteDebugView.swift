@@ -85,6 +85,11 @@ struct NetSuiteDebugView: View {
                                 action: { performAPITest("invoices", fetchInvoices) }
                             )
                             DebugButton(
+                                title: "Fetch Invoices by Date Range",
+                                isLoading: isLoading && loadingTask == "date_range_invoices",
+                                action: { performAPITest("date_range_invoices", fetchInvoicesByDateRange) }
+                            )
+                            DebugButton(
                                 title: "Test Raw Customer API",
                                 isLoading: isLoading && loadingTask == "raw_customer",
                                 action: { performAPITest("raw_customer", testRawCustomerAPI) }
@@ -98,6 +103,16 @@ struct NetSuiteDebugView: View {
                                 title: "Generate OAuth URL",
                                 isLoading: isLoading && loadingTask == "oauth_url",
                                 action: { performAPITest("oauth_url", generateOAuthURL) }
+                            )
+                            DebugButton(
+                                title: "Test API Functionality",
+                                isLoading: isLoading && loadingTask == "api_functionality",
+                                action: { performAPITest("api_functionality", testAPIFunctionality) }
+                            )
+                            DebugButton(
+                                title: "Get API Configuration",
+                                isLoading: isLoading && loadingTask == "api_config",
+                                action: { performAPITest("api_config", getAPIConfiguration) }
                             )
                             DebugButton(
                                 title: "Check Data Status",
@@ -138,6 +153,16 @@ struct NetSuiteDebugView: View {
                                 title: "Discover Transaction Columns",
                                 isLoading: isLoading && loadingTask == "discover_columns",
                                 action: { performAPITest("discover_columns", discoverTransactionColumns) }
+                            )
+                            DebugButton(
+                                title: "Test BUILTIN.CF",
+                                isLoading: isLoading && loadingTask == "builtin_cf",
+                                action: { performAPITest("builtin_cf", testBuiltinCF) }
+                            )
+                            DebugButton(
+                                title: "Test BUILTIN.DF",
+                                isLoading: isLoading && loadingTask == "builtin_df",
+                                action: { performAPITest("builtin_df", testBuiltinDF) }
                             )
                             DebugButton(
                                 title: "Clear Debug Output",
@@ -250,10 +275,8 @@ struct NetSuiteDebugView: View {
                 return "Invalid response from NetSuite API. The response format may have changed."
             case .authenticationFailed:
                 return "Authentication failed. Your access token may be expired or invalid."
-            case .invalidURL:
-                return "Invalid URL for NetSuite API request. Check your account ID configuration."
-            case .unauthorizedRequest:
-                return "Request unauthorized (401). Token has been refreshed automatically."
+            case .rateLimited:
+                return "NetSuite API rate limit exceeded. Please try again shortly."
             }
         }
         
@@ -335,6 +358,39 @@ struct NetSuiteDebugView: View {
         }
     }
     
+    private func fetchInvoicesByDateRange() async throws {
+        log("🔍 Fetching invoices by date range (last 30 days)...")
+        
+        // Use the new date range query
+        let dateRangeInvoices = try await netSuiteAPI.fetchCustomerInvoicesByDateRange(
+            fromDate: "2024-01-01", // You can adjust this date as needed
+            toDate: nil // nil means use relative date range (last 30 days)
+        )
+        
+        log("✅ Successfully fetched \(dateRangeInvoices.count) invoices by date range")
+        
+        // Log detailed invoice information
+        for (index, invoice) in dateRangeInvoices.enumerated() {
+            log("  📄 \(index + 1). \(invoice.invoiceNumber) - \(invoice.customerName)")
+            log("     💰 Total: $\(String(format: "%.2f", invoice.totalAmount ?? 0.0))")
+            log("     💳 Balance Due: $\(String(format: "%.2f", invoice.balanceDue ?? 0.0))")
+            log("     📅 Date: \(invoice.invoiceDate)")
+            log("     📋 Status: \(invoice.status)")
+            if let salesOrder = invoice.salesOrder {
+                log("     📋 Sales Order: \(salesOrder)")
+            }
+            if let salesRep = invoice.salesRepName {
+                log("     👤 Sales Rep: \(salesRep)")
+            }
+            log("")
+        }
+        
+        await MainActor.run {
+            alertMessage = "Successfully fetched \(dateRangeInvoices.count) invoices by date range"
+            showingAlert = true
+        }
+    }
+    
     private func testRawCustomerAPI() async throws {
         log("🔍 Testing raw customer API...")
         let response = try await netSuiteAPIDebug.testRawAPI(endpoint: "/services/rest/record/v1/customer?limit=5")
@@ -407,8 +463,8 @@ struct NetSuiteDebugView: View {
         
         // Test parsed data
         log("🔄 Testing parsed data...")
-        let customers = try await netSuiteAPI.fetchCustomers()
-        let invoices = try await netSuiteAPI.fetchInvoices()
+        let customers = try await netSuiteAPIDebug.fetchCustomers()
+        let invoices = try await netSuiteAPIDebug.fetchInvoices()
         
         log("✅ Parsed NetSuite Data:")
         log("  • Fetched \(customers.count) customers")
@@ -546,7 +602,7 @@ struct NetSuiteDebugView: View {
         log("🔍 Testing enhanced pagination for invoices...")
         
         // Test the new fetchAllInvoices method
-        let invoices = try await netSuiteAPI.fetchAllInvoices()
+        let invoices = try await netSuiteAPI.fetchAllInvoices() as [Invoice]
         
         log("✅ Enhanced pagination test successful!")
         log("📊 Results:")
@@ -571,7 +627,7 @@ struct NetSuiteDebugView: View {
         log("🔍 Testing detailed invoice fetching with Codable models...")
         
         // First get some invoice IDs
-        let invoices = try await netSuiteAPI.fetchAllInvoices()
+        let invoices = try await netSuiteAPI.fetchAllInvoices() as [Invoice]
         
         if invoices.isEmpty {
             log("❌ No invoices found to test detailed fetching")
@@ -650,7 +706,7 @@ struct NetSuiteDebugView: View {
         log("🔍 Testing detailed customer fetching with Codable models...")
         
         // First get some customer IDs
-        let customers = try await netSuiteAPI.fetchAllCustomers()
+        let customers = try await netSuiteAPI.fetchAllCustomers() as [Customer]
         
         if customers.isEmpty {
             log("❌ No customers found to test detailed fetching")
@@ -758,39 +814,70 @@ struct NetSuiteDebugView: View {
         }
     }
     
+    /// Test SuiteQL queries for payment data
     private func testSuiteQLQueries() async {
-        log("🔍 Testing SuiteQL queries for customer transaction and payment history...")
-        
         do {
-            // Test SuiteQL for Customer Transaction History
-            log("📋 Testing SuiteQL for Customer Transaction History...")
-            let transactionQuery = SuiteQLQuery.customerTransactionHistory(customerId: "1264") // Use a valid customer ID
-            let transactionResponse = try await NetSuiteAPI.shared.executeSuiteQLQuery(transactionQuery.query)
-            log("✅ SuiteQL Transaction History executed successfully")
-            log("   - Count: \(transactionResponse.count)")
-            log("   - Has More: \(transactionResponse.hasMore)")
-            log("   - Items: \(transactionResponse.items.count)")
+            log("🧪 Testing SuiteQL Queries...")
             
-            // Test SuiteQL for Customer Payment History
-            log("📋 Testing SuiteQL for Customer Payment History...")
-            let paymentQuery = SuiteQLQuery.customerPaymentHistory(customerId: "1264") // Use a valid customer ID
-            let paymentResponse = try await NetSuiteAPI.shared.executeSuiteQLQuery(paymentQuery.query)
-            log("✅ SuiteQL Payment History executed successfully")
-            log("   - Count: \(paymentResponse.count)")
-            log("   - Has More: \(paymentResponse.hasMore)")
-            log("   - Items: \(paymentResponse.items.count)")
+            // Test basic payment query WITHOUT BUILTIN.CF
+            log("📋 Testing basic payment query WITHOUT BUILTIN.CF...")
+            let basicPaymentQuery = """
+            SELECT 
+                t.id,
+                t.tranid,
+                t.trandate,
+                t.total,
+                t.status,
+                t.entity
+            FROM transaction t
+            WHERE t.type = 'CustPymt'
+            ORDER BY t.trandate DESC
+            LIMIT 5
+            """
             
-            // Test SuiteQL for Customer Invoice History
-            log("📋 Testing SuiteQL for Customer Invoice History...")
-            let invoiceQuery = SuiteQLQuery.customerInvoiceHistory(customerId: "1264") // Use a valid customer ID
-            let invoiceResponse = try await NetSuiteAPI.shared.executeSuiteQLQuery(invoiceQuery.query)
-            log("✅ SuiteQL Invoice History executed successfully")
-            log("   - Count: \(invoiceResponse.count)")
-            log("   - Has More: \(invoiceResponse.hasMore)")
-            log("   - Items: \(invoiceResponse.items.count)")
+            let basicResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(basicPaymentQuery)
+            log("✅ Basic payment query successful - Found \(basicResponse.items.count) payments")
+            
+            // Test payment query WITH BUILTIN.CF for status
+            log("📋 Testing payment query WITH BUILTIN.CF for status...")
+            let builtinCFQuery = """
+            SELECT 
+                t.id,
+                t.tranid,
+                t.trandate,
+                t.total,
+                BUILTIN.CF(t.status) as status,
+                t.entity
+            FROM transaction t
+            WHERE t.type = 'CustPymt'
+            ORDER BY t.trandate DESC
+            LIMIT 5
+            """
+            
+            let builtinCFResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(builtinCFQuery)
+            log("✅ BUILTIN.CF payment query successful - Found \(builtinCFResponse.items.count) payments")
+            
+            // Test payment query with date filter
+            log("📋 Testing payment query with date filter...")
+            let dateFilterQuery = """
+            SELECT 
+                t.id,
+                t.tranid,
+                t.trandate,
+                t.total,
+                t.status,
+                t.entity
+            FROM transaction t
+            WHERE t.type = 'CustPymt' AND t.trandate >= '2024-01-01'
+            ORDER BY t.trandate DESC
+            LIMIT 5
+            """
+            
+            let dateFilterResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(dateFilterQuery)
+            log("✅ Date filter query successful - Found \(dateFilterResponse.items.count) payments")
             
             await MainActor.run {
-                alertMessage = "SuiteQL queries executed successfully! All three query types (transactions, payments, invoices) returned results."
+                alertMessage = "SuiteQL queries tested successfully! Basic: \(basicResponse.items.count) payments, BUILTIN.CF: \(builtinCFResponse.items.count) payments, Date filter: \(dateFilterResponse.items.count) payments"
                 showingAlert = true
             }
             
@@ -803,10 +890,189 @@ struct NetSuiteDebugView: View {
         }
     }
     
+    /// Test BUILTIN.CF functionality specifically
+    private func testBuiltinCF() async {
+        do {
+            log("🧪 Testing BUILTIN.CF Functionality...")
+            
+            // Test status comparison with and without BUILTIN.CF
+            log("📋 Testing status retrieval WITH vs WITHOUT BUILTIN.CF...")
+            
+            // Query without BUILTIN.CF
+            let withoutBuiltinCF = """
+            SELECT 
+                t.id,
+                t.tranid,
+                t.status as raw_status
+            FROM transaction t
+            WHERE t.type = 'CustPymt'
+            ORDER BY t.trandate DESC
+            LIMIT 3
+            """
+            
+            let withoutResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(withoutBuiltinCF)
+            log("📊 Status values WITHOUT BUILTIN.CF:")
+            for item in withoutResponse.items {
+                let status = item.values["column2"] ?? "N/A"
+                log("  - \(status)")
+            }
+            
+            // Query with BUILTIN.CF
+            let withBuiltinCF = """
+            SELECT 
+                t.id,
+                t.tranid,
+                BUILTIN.CF(t.status) as combined_status
+            FROM transaction t
+            WHERE t.type = 'CustPymt'
+            ORDER BY t.trandate DESC
+            LIMIT 3
+            """
+            
+            let withResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(withBuiltinCF)
+            log("📊 Status values WITH BUILTIN.CF:")
+            for item in withResponse.items {
+                let status = item.values["column2"] ?? "N/A"
+                log("  - \(status)")
+            }
+            
+            // Test filtering with BUILTIN.CF
+            log("📋 Testing status filtering WITH BUILTIN.CF...")
+            let filterQuery = """
+            SELECT 
+                t.id,
+                t.tranid,
+                BUILTIN.CF(t.status) as status
+            FROM transaction t
+            WHERE t.type = 'CustPymt' AND BUILTIN.CF(t.status) LIKE '%CustPymt%'
+            ORDER BY t.trandate DESC
+            LIMIT 3
+            """
+            
+            let filterResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(filterQuery)
+            log("✅ BUILTIN.CF filtering successful - Found \(filterResponse.items.count) payments with status filter")
+            
+            await MainActor.run {
+                alertMessage = "BUILTIN.CF test successful! Without: \(withoutResponse.items.count), With: \(withResponse.items.count), Filtered: \(filterResponse.items.count)"
+                showingAlert = true
+            }
+            
+        } catch {
+            log("❌ BUILTIN.CF test failed: \(error.localizedDescription)")
+            await MainActor.run {
+                alertMessage = "BUILTIN.CF test failed: \(error.localizedDescription)"
+                showingAlert = true
+            }
+        }
+    }
+    
+    /// Test BUILTIN.DF functionality specifically
+    private func testBuiltinDF() async {
+        do {
+            log("🧪 Testing BUILTIN.DF Functionality...")
+            
+            // Test customer name retrieval with and without BUILTIN.DF
+            log("📋 Testing customer name retrieval WITH vs WITHOUT BUILTIN.DF...")
+            
+            // Query without BUILTIN.DF (just entity ID)
+            let withoutBuiltinDF = """
+            SELECT 
+                t.id,
+                t.tranid,
+                t.entity as customer_id
+            FROM transaction t
+            WHERE t.type = 'CustPymt'
+            ORDER BY t.trandate DESC
+            LIMIT 3
+            """
+            
+            let withoutResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(withoutBuiltinDF)
+            log("📊 Customer IDs WITHOUT BUILTIN.DF:")
+            for item in withoutResponse.items {
+                let customerId = item.values["column2"] ?? "N/A"
+                log("  - \(customerId)")
+            }
+            
+            // Query with BUILTIN.DF (customer names)
+            let withBuiltinDF = """
+            SELECT 
+                t.id,
+                t.tranid,
+                BUILTIN.DF(t.entity) as customer_name
+            FROM transaction t
+            WHERE t.type = 'CustPymt'
+            ORDER BY t.trandate DESC
+            LIMIT 3
+            """
+            
+            let withResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(withBuiltinDF)
+            log("📊 Customer Names WITH BUILTIN.DF:")
+            for item in withResponse.items {
+                let customerName = item.values["column2"] ?? "N/A"
+                log("  - \(customerName)")
+            }
+            
+            // Test combined BUILTIN.CF and BUILTIN.DF
+            log("📋 Testing combined BUILTIN.CF and BUILTIN.DF...")
+            let combinedQuery = """
+            SELECT 
+                t.id,
+                t.tranid,
+                BUILTIN.CF(t.status) as status,
+                BUILTIN.DF(t.entity) as customer_name
+            FROM transaction t
+            WHERE t.type = 'CustPymt'
+            ORDER BY t.trandate DESC
+            LIMIT 3
+            """
+            
+            let combinedResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(combinedQuery)
+            log("📊 Combined BUILTIN.CF and BUILTIN.DF results:")
+            for item in combinedResponse.items {
+                let status = item.values["column2"] ?? "N/A"
+                let customerName = item.values["column3"] ?? "N/A"
+                log("  - Status: \(status), Customer: \(customerName)")
+            }
+            
+            // Test item name retrieval
+            log("📋 Testing item name retrieval with BUILTIN.DF...")
+            let itemQuery = """
+            SELECT 
+                t.id,
+                t.tranid,
+                BUILTIN.DF(t.item) as item_name
+            FROM transaction t
+            WHERE t.type = 'CustInvc'
+            AND t.item IS NOT NULL
+            ORDER BY t.trandate DESC
+            LIMIT 3
+            """
+            
+            let itemResponse = try await NetSuiteAPI.shared.debugSuiteQLQuery(itemQuery)
+            log("📊 Item Names WITH BUILTIN.DF:")
+            for item in itemResponse.items {
+                let itemName = item.values["column2"] ?? "N/A"
+                log("  - \(itemName)")
+            }
+            
+            await MainActor.run {
+                alertMessage = "BUILTIN.DF test successful! Without: \(withoutResponse.items.count), With: \(withResponse.items.count), Combined: \(combinedResponse.items.count), Items: \(itemResponse.items.count)"
+                showingAlert = true
+            }
+            
+        } catch {
+            log("❌ BUILTIN.DF test failed: \(error.localizedDescription)")
+            await MainActor.run {
+                alertMessage = "BUILTIN.DF test failed: \(error.localizedDescription)"
+                showingAlert = true
+            }
+        }
+    }
+    
     /// Discover available columns in NetSuite transaction table
     private func discoverTransactionColumns() async {
         do {
-            let columns = try await netSuiteAPI.debugTableColumns("transaction")
+            let columns = try await netSuiteAPI.fetchColumns(for: "transaction")
             await MainActor.run {
                 log("🔍 Transaction Table Column Discovery")
                 log("📊 Available columns in 'transaction' table:")
@@ -815,6 +1081,10 @@ struct NetSuiteDebugView: View {
                 }
                 log("💡 Use these column names in your SuiteQL SELECT statements")
                 log("✅ Total columns found: \(columns.count)")
+                log("")
+                log("📋 Example usage:")
+                log("SELECT id, tranid, entity, status, trandate")
+                log("FROM transaction WHERE type = 'CustPymt'")
             }
         } catch {
             await MainActor.run {
@@ -827,6 +1097,36 @@ struct NetSuiteDebugView: View {
     
     private func clearDebugOutput() {
         debugOutput = ""
+    }
+    
+    // MARK: - New API Testing Methods
+    
+    /// Test SuiteQL vs REST API functionality
+    private func testAPIFunctionality() async {
+        log("🧪 Testing API Functionality...")
+        let results = await netSuiteAPI.testAPIFunctionality()
+        
+        await MainActor.run {
+            log("📊 API Functionality Test Results:")
+            for (test, result) in results {
+                log("  \(test): \(result)")
+            }
+            log("✅ API functionality test completed")
+        }
+    }
+    
+    /// Get current API configuration status
+    private func getAPIConfiguration() async {
+        log("⚙️ Getting API Configuration Status...")
+        let config = netSuiteAPI.getAPIConfigurationStatus()
+        
+        await MainActor.run {
+            log("📋 API Configuration Status:")
+            for (key, value) in config {
+                log("  \(key): \(value)")
+            }
+            log("✅ Configuration status retrieved")
+        }
     }
 }
 

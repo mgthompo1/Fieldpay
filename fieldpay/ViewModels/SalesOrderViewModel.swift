@@ -140,6 +140,34 @@ class SalesOrderViewModel: ObservableObject {
         return salesOrders.first { $0.id == id }
     }
     
+    // MARK: - Enhanced Sales Order Functions
+    
+    // Note: loadSalesOrderLineItems has been removed as line items are now
+    // fetched directly when loading sales orders
+    
+    func loadSalesOrdersWithPaymentInfo(for customerId: String) async throws -> [NetSuiteSalesOrderWithPayment] {
+        return try await netSuiteAPI.fetchSalesOrdersWithPaymentInfo(for: customerId)
+    }
+    
+    func loadCustomerDeposits(for customerId: String) async throws -> [NetSuiteCustomerDeposit] {
+        return try await netSuiteAPI.fetchCustomerDeposits(for: customerId)
+    }
+    
+    func loadSalesOrdersWithDeposits(for customerId: String) async throws -> [NetSuiteSalesOrderWithDeposit] {
+        return try await netSuiteAPI.fetchSalesOrdersWithDeposits(for: customerId)
+    }
+    
+    // MARK: - Payment Status Helpers
+    
+    func getUnpaidOrders() -> [SalesOrder] {
+        return salesOrders.filter { $0.status != .cancelled }
+    }
+    
+    func getOrdersByPaymentStatus(hasOutstandingAmount: Bool) -> [SalesOrder] {
+        // This would need to be enhanced to work with the new payment data
+        return salesOrders
+    }
+    
     func createSalesOrder(customerId: String, 
                          customerName: String, 
                          amount: Decimal, 

@@ -97,97 +97,121 @@ class KeychainWrapper {
     // MARK: - NetSuite Token Operations
     
     func saveNetSuiteTokens(accessToken: String, refreshToken: String, expiryDate: Date) -> Bool {
-        print("Debug: KeychainWrapper - Saving NetSuite tokens to Keychain")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Saving NetSuite tokens to Keychain")
+        }
         
         let accessTokenSaved = saveString(key: NetSuiteKeys.accessToken, value: accessToken)
         let refreshTokenSaved = saveString(key: NetSuiteKeys.refreshToken, value: refreshToken)
         let expiryDateSaved = saveDate(key: NetSuiteKeys.tokenExpiry, value: expiryDate)
         
-        print("Debug: KeychainWrapper - Token storage results:")
-        print("Debug: - Access token saved: \(accessTokenSaved)")
-        print("Debug: - Refresh token saved: \(refreshTokenSaved)")
-        print("Debug: - Expiry date saved: \(expiryDateSaved)")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Token storage results:")
+            print("Debug: - Access token saved: \(accessTokenSaved)")
+            print("Debug: - Refresh token saved: \(refreshTokenSaved)")
+            print("Debug: - Expiry date saved: \(expiryDateSaved)")
+        }
         
         return accessTokenSaved && refreshTokenSaved && expiryDateSaved
     }
     
     func loadNetSuiteTokens() -> (accessToken: String?, refreshToken: String?, expiryDate: Date?) {
-        print("Debug: KeychainWrapper - Loading NetSuite tokens from Keychain")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Loading NetSuite tokens from Keychain")
+        }
         
         let accessToken = loadString(key: NetSuiteKeys.accessToken)
         let refreshToken = loadString(key: NetSuiteKeys.refreshToken)
         let expiryDate = loadDate(key: NetSuiteKeys.tokenExpiry)
         
-        print("Debug: KeychainWrapper - Token loading results:")
-        print("Debug: - Access token loaded: \(accessToken != nil)")
-        print("Debug: - Refresh token loaded: \(refreshToken != nil)")
-        print("Debug: - Expiry date loaded: \(expiryDate != nil)")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Token loading results:")
+            print("Debug: - Access token loaded: \(accessToken != nil)")
+            print("Debug: - Refresh token loaded: \(refreshToken != nil)")
+            print("Debug: - Expiry date loaded: \(expiryDate != nil)")
+        }
         
         return (accessToken: accessToken, refreshToken: refreshToken, expiryDate: expiryDate)
     }
     
     func clearNetSuiteTokens() -> Bool {
-        print("Debug: KeychainWrapper - Clearing NetSuite tokens from Keychain")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Clearing NetSuite tokens from Keychain")
+        }
         
         let accessTokenDeleted = delete(key: NetSuiteKeys.accessToken)
         let refreshTokenDeleted = delete(key: NetSuiteKeys.refreshToken)
         let expiryDateDeleted = delete(key: NetSuiteKeys.tokenExpiry)
         
-        print("Debug: KeychainWrapper - Token deletion results:")
-        print("Debug: - Access token deleted: \(accessTokenDeleted)")
-        print("Debug: - Refresh token deleted: \(refreshTokenDeleted)")
-        print("Debug: - Expiry date deleted: \(expiryDateDeleted)")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Token deletion results:")
+            print("Debug: - Access token deleted: \(accessTokenDeleted)")
+            print("Debug: - Refresh token deleted: \(accessTokenDeleted)")
+            print("Debug: - Expiry date deleted: \(expiryDateDeleted)")
+        }
         
         return accessTokenDeleted && refreshTokenDeleted && expiryDateDeleted
     }
     
     func saveNetSuiteConfiguration(accountId: String, clientId: String, clientSecret: String, redirectUri: String) -> Bool {
-        print("Debug: KeychainWrapper - Saving NetSuite configuration to Keychain")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Saving NetSuite configuration to Keychain")
+        }
         
         let accountIdSaved = saveString(key: NetSuiteKeys.accountId, value: accountId)
         let clientIdSaved = saveString(key: NetSuiteKeys.clientId, value: clientId)
         let clientSecretSaved = saveString(key: NetSuiteKeys.clientSecret, value: clientSecret)
         let redirectUriSaved = saveString(key: NetSuiteKeys.redirectUri, value: redirectUri)
         
-        print("Debug: KeychainWrapper - Configuration storage results:")
-        print("Debug: - Account ID saved: \(accountIdSaved)")
-        print("Debug: - Client ID saved: \(clientIdSaved)")
-        print("Debug: - Client Secret saved: \(clientSecretSaved)")
-        print("Debug: - Redirect URI saved: \(redirectUriSaved)")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Configuration storage results:")
+            print("Debug: - Account ID saved: \(accountIdSaved)")
+            print("Debug: - Refresh token saved: \(clientIdSaved)")
+            print("Debug: - Client Secret saved: \(clientSecretSaved)")
+            print("Debug: - Redirect URI saved: \(redirectUriSaved)")
+        }
         
         return accountIdSaved && clientIdSaved && clientSecretSaved && redirectUriSaved
     }
     
     func loadNetSuiteConfiguration() -> (accountId: String?, clientId: String?, clientSecret: String?, redirectUri: String?) {
-        print("Debug: KeychainWrapper - Loading NetSuite configuration from Keychain")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Loading NetSuite configuration from Keychain")
+        }
         
         let accountId = loadString(key: NetSuiteKeys.accountId)
         let clientId = loadString(key: NetSuiteKeys.clientId)
         let clientSecret = loadString(key: NetSuiteKeys.clientSecret)
         let redirectUri = loadString(key: NetSuiteKeys.redirectUri)
         
-        print("Debug: KeychainWrapper - Configuration loading results:")
-        print("Debug: - Account ID loaded: \(accountId != nil)")
-        print("Debug: - Client ID loaded: \(clientId != nil)")
-        print("Debug: - Client Secret loaded: \(clientSecret != nil)")
-        print("Debug: - Redirect URI loaded: \(redirectUri != nil)")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Configuration loading results:")
+            print("Debug: - Account ID loaded: \(accountId != nil)")
+            print("Debug: - Client ID loaded: \(clientId != nil)")
+            print("Debug: - Client Secret loaded: \(clientSecret != nil)")
+            print("Debug: - Redirect URI loaded: \(redirectUri != nil)")
+        }
         
         return (accountId: accountId, clientId: clientId, clientSecret: clientSecret, redirectUri: redirectUri)
     }
     
     func clearNetSuiteConfiguration() -> Bool {
-        print("Debug: KeychainWrapper - Clearing NetSuite configuration from Keychain")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Clearing NetSuite configuration from Keychain")
+        }
         
         let accountIdDeleted = delete(key: NetSuiteKeys.accountId)
         let clientIdDeleted = delete(key: NetSuiteKeys.clientId)
         let clientSecretDeleted = delete(key: NetSuiteKeys.clientSecret)
         let redirectUriDeleted = delete(key: NetSuiteKeys.redirectUri)
         
-        print("Debug: KeychainWrapper - Configuration deletion results:")
-        print("Debug: - Account ID deleted: \(accountIdDeleted)")
-        print("Debug: - Client ID deleted: \(clientIdDeleted)")
-        print("Debug: - Client Secret deleted: \(clientSecretDeleted)")
-        print("Debug: - Redirect URI deleted: \(redirectUriDeleted)")
+        if DebugLogConfig.shared.logConfigurationLoading {
+            print("Debug: KeychainWrapper - Configuration deletion results:")
+            print("Debug: - Account ID deleted: \(accountIdDeleted)")
+            print("Debug: - Client ID deleted: \(clientIdDeleted)")
+            print("Debug: - Client Secret deleted: \(clientSecretDeleted)")
+            print("Debug: - Redirect URI deleted: \(redirectUriDeleted)")
+        }
         
         return accountIdDeleted && clientIdDeleted && clientSecretDeleted && redirectUriDeleted
     }

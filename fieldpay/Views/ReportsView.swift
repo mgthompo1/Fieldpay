@@ -144,7 +144,7 @@ struct ReportsView: View {
                     ], spacing: 16) {
                         ModernSummaryCard(
                             title: "Total Revenue",
-                            value: String(format: "$%.0f", getTotalRevenue()),
+                            value: String(format: "$%.0f", max(0, getTotalRevenue().isFinite ? getTotalRevenue() : 0)),
                             subtitle: "This period",
                             icon: "dollarsign.circle.fill",
                             color: .green,
@@ -162,7 +162,7 @@ struct ReportsView: View {
                         
                         ModernSummaryCard(
                             title: "Outstanding",
-                            value: String(format: "$%.0f", getOutstandingAmount()),
+                            value: String(format: "$%.0f", max(0, getOutstandingAmount().isFinite ? getOutstandingAmount() : 0)),
                             subtitle: "Invoices",
                             icon: "exclamationmark.triangle.fill",
                             color: .orange,
@@ -427,7 +427,7 @@ struct ModernChartContainer: View {
                             .fill(
                                 LinearGradient(colors: [.blue, .cyan], startPoint: .bottom, endPoint: .top)
                             )
-                            .frame(width: 24, height: max(20, CGFloat(point.value / 25)))
+                            .frame(width: 24, height: max(20, CGFloat((point.value.isFinite ? point.value : 0) / 25)))
                             .shadow(color: .blue.opacity(0.3), radius: 2, x: 0, y: 1)
                         
                         // Date Label
