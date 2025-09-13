@@ -84,7 +84,7 @@ enum NetSuiteResource {
             return components.url!
         case .customerDetail(let id):
             return URL(string: baseURL + NetSuiteAPIPath.customer + "/\(id)")!
-        case .customerPayments(let _, let limit, let offset):
+        case .customerPayments(_, let limit, let offset):
             var components = URLComponents(string: baseURL + NetSuiteAPIPath.customerPayment)!
             components.queryItems = [
                 URLQueryItem(name: "limit", value: String(limit)),
@@ -625,7 +625,7 @@ class NetSuiteAPI: ObservableObject {
         let lineResource = NetSuiteResource.suiteQL(query: lineItemQuery)
         let lineResp: SuiteQLResponse = try await performWithTokenRetry(lineResource, responseType: SuiteQLResponse.self)
         
-        let lineItems: [LineItem] = lineResp.items.map { row in
+        let _ = lineResp.items.map { row in
             let itemId = row.values["column2"] ?? ""
             let itemName = row.values["column9"] ?? row.values["column8"] ?? "Unknown Item"
             let description = row.values["column7"] ?? row.values["column10"] ?? itemName
@@ -650,7 +650,7 @@ class NetSuiteAPI: ObservableObject {
         
         // Enhanced customer information query
         let customerId = row.values["column2"] ?? ""
-        let customerName = await fetchCustomerName(customerId: customerId)
+        let _ = await fetchCustomerName(customerId: customerId)
         
         let record = NetSuiteInvoiceRecord(
             id: row.values["column0"] ?? id,
@@ -1160,12 +1160,12 @@ class NetSuiteAPI: ObservableObject {
         return response.items
             .compactMap { row -> Payment? in
                 guard let id = row.values["Transaction"],
-                      let tranId = row.values["TranID"],
+                      let _ = row.values["TranID"],
                       let dateStr = row.values["TranDate"],
                       let totalStr = row.values["ForeignTotal"],
                       let entityId = row.values["CustomerID"],
-                      let status = row.values["StatusDisplay"],
-                      let memo = row.values["Memo"] else {
+                      let _ = row.values["StatusDisplay"],
+                      let _ = row.values["Memo"] else {
                     return nil
                 }
                 
@@ -1263,12 +1263,12 @@ class NetSuiteAPI: ObservableObject {
             }
             .map { row in
                 let id = row.values["id"]!
-                let tranId = row.values["tranid"]!
+                let _ = row.values["tranid"]!
                 let dateStr = row.values["trandate"]!
                 let totalStr = row.values["total"]!
                 let entityId = row.values["entity"]!
-                let status = row.values["status"]!
-                let memo = row.values["memo"]!
+                let _ = row.values["status"]!
+                let _ = row.values["memo"]!
                 
                 let date = NetSuiteDateParser.parseDate(dateStr) ?? Date()
                 let total = Double(totalStr) ?? 0.0
@@ -1293,7 +1293,7 @@ class NetSuiteAPI: ObservableObject {
         return response.items
             .compactMap { row -> NetSuiteTransaction? in
                 guard let id = row.values["id"],
-                      let tranId = row.values["tranid"],
+                      let _ = row.values["tranid"],
                       let dateStr = row.values["trandate"],
                       let totalStr = row.values["total"],
                       let type = row.values["type"],
@@ -1552,7 +1552,7 @@ class NetSuiteAPI: ObservableObject {
         var transactions: [NetSuiteTransaction] = []
         for row in response.items {
             let id = row.values["id"] ?? ""
-            let tranId = row.values["tranid"] ?? ""
+            let _ = row.values["tranid"] ?? ""
             let dateStr = row.values["trandate"] ?? ""
             let amount = safeParseAmount(row.values["total"] ?? "0")
             let type = row.values["type"] ?? ""
@@ -1585,7 +1585,7 @@ class NetSuiteAPI: ObservableObject {
         var payments: [Payment] = []
         for row in response.items {
             let id = row.values["transaction"] ?? ""
-            let paymentNumber = row.values["tranid"] ?? ""
+            let _ = row.values["tranid"] ?? ""
             let dateStr = row.values["trandate"] ?? ""
             let amount = safeParseAmount(row.values["foreigntotal"] ?? "0")
             let status = row.values["statusdisplay"] ?? ""
@@ -2043,7 +2043,7 @@ class NetSuiteAPI: ObservableObject {
         
         return response.items.map { row in
             let id = row.values["idraw"] ?? ""
-            let tranId = row.values["tranidraw"] ?? ""
+            let _ = row.values["tranidraw"] ?? ""
             let dateStr = row.values["trandateraw"] ?? ""
             let amount = safeParseAmount(row.values["amountraw"])
             let type = row.values["typeraw"] ?? ""
@@ -2305,12 +2305,8 @@ class NetSuiteAPI: ObservableObject {
         }
         
         // Test fallback logic
-        do {
-            let customerName = await fetchCustomerName(customerId: "2128")
-            results["Fallback_Test"] = "✅ Success - Customer name: \(customerName)"
-        } catch {
-            results["Fallback_Test"] = "❌ Failed - \(error.localizedDescription)"
-        }
+        let customerName = await fetchCustomerName(customerId: "2128")
+        results["Fallback_Test"] = "✅ Success - Customer name: \(customerName)"
         
         // Test specific payment query
         do {
