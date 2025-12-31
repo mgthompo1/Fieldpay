@@ -598,7 +598,9 @@ struct InvoiceDetailView: View {
                                 color: .blue,
                                 gradient: LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing)
                             ) {
-                                viewModel.markInvoiceAsPaid(currentInvoice)
+                                Task {
+                                    await viewModel.markInvoiceAsPaid(currentInvoice)
+                                }
                             }
                         }
 

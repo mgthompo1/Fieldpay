@@ -250,22 +250,24 @@ struct NewInvoiceView: View {
 
         let total = invoiceViewModel.selectedItemsTotal
 
-        // Use the VM's create method so the list updates and (if implemented) NetSuite call runs
-        invoiceViewModel.createInvoice(
-            customerId: customer.id,
-            customerName: customer.name,
-            amount: total,
-            items: items,
-            dueDate: dueDate
-        )
+        // Use the VM's create method so the list updates and NetSuite sync runs
+        Task {
+            await invoiceViewModel.createInvoice(
+                customerId: customer.id,
+                customerName: customer.name,
+                amount: total,
+                items: items,
+                dueDate: dueDate
+            )
 
-        // Minimal UX: clear and dismiss (if you later add async NetSuite creation, move this into completion)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            isSubmitting = false
-            invoiceViewModel.clearSelectedItems()
-            selectedCustomer = nil
-            notes = ""
-            dismiss()
+            // Clear and dismiss after creation
+            await MainActor.run {
+                isSubmitting = false
+                invoiceViewModel.clearSelectedItems()
+                selectedCustomer = nil
+                notes = ""
+                dismiss()
+            }
         }
     }
 }

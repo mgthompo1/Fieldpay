@@ -3,35 +3,53 @@ import Combine
 
 class StripeManager: ObservableObject {
     static let shared = StripeManager()
-    
+
     private var publishableKey: String = ""
     private var secretKey: String = ""
     private var accountId: String = ""
     private let baseURL = "https://api.stripe.com/v1"
-    
+    private let keychain = KeychainHelper.shared
+
+    @Published var isConfigured: Bool = false
+
     private init() {
-        // Load from UserDefaults if available
+        // Migrate any existing credentials from UserDefaults to Keychain (one-time)
+        keychain.migrateStripeCredentials()
+        // Load from Keychain
         loadConfiguration()
     }
-    
+
     // MARK: - Configuration
     func updateConfiguration(publicKey: String, secretKey: String, accountId: String) {
         self.publishableKey = publicKey
         self.secretKey = secretKey
         self.accountId = accountId
-        
-        // Store in UserDefaults
-        UserDefaults.standard.set(publicKey, forKey: "stripe_public_key")
-        UserDefaults.standard.set(secretKey, forKey: "stripe_secret_key")
-        UserDefaults.standard.set(accountId, forKey: "stripe_account_id")
-        
+
+        // Store securely in Keychain (not UserDefaults)
+        keychain.stripePublicKey = publicKey
+        keychain.stripeSecretKey = secretKey
+        keychain.stripeAccountId = accountId
+
+        self.isConfigured = !secretKey.isEmpty
         print("Stripe configured with publishable key: \(publicKey.prefix(10))...")
     }
-    
+
     private func loadConfiguration() {
-        publishableKey = UserDefaults.standard.string(forKey: "stripe_public_key") ?? ""
-        secretKey = UserDefaults.standard.string(forKey: "stripe_secret_key") ?? ""
-        accountId = UserDefaults.standard.string(forKey: "stripe_account_id") ?? ""
+        publishableKey = keychain.stripePublicKey ?? ""
+        secretKey = keychain.stripeSecretKey ?? ""
+        accountId = keychain.stripeAccountId ?? ""
+        isConfigured = !secretKey.isEmpty
+    }
+
+    /// Clear all Stripe credentials from Keychain
+    func clearCredentials() {
+        keychain.stripePublicKey = nil
+        keychain.stripeSecretKey = nil
+        keychain.stripeAccountId = nil
+        publishableKey = ""
+        secretKey = ""
+        accountId = ""
+        isConfigured = false
     }
     
     func testConnection() async throws -> Bool {
@@ -345,18 +363,155 @@ class StripeManager: ObservableObject {
     }
     
     // MARK: - Tap to Pay (for iOS)
+
+    /// Stripe Terminal SDK integration state
+    @Published var isTapToPayReady: Bool = false
+    @Published var tapToPayError: String?
+    private var connectionToken: String?
+
+    /// Setup Tap to Pay - requires Stripe Terminal SDK
+    /// NOTE: Add 'StripeTerminal' to your Package.swift or Podfile:
+    /// - SPM: .package(url: "https://github.com/stripe/stripe-terminal-ios", from: "3.0.0")
+    /// - CocoaPods: pod 'StripeTerminal', '~> 3.0'
     func setupTapToPay() async throws {
-        // This would integrate with Stripe's Tap to Pay SDK
-        // For now, we'll just print a setup message
-        print("Setting up Stripe Tap to Pay...")
+        guard !secretKey.isEmpty else {
+            throw StripeError.notConfigured
+        }
+
+        print("Debug: StripeManager - Setting up Tap to Pay...")
+
+        // Step 1: Fetch a connection token from your backend
+        // In production, this should call YOUR backend which creates the token securely
+        connectionToken = try await fetchConnectionToken()
+
+        // Step 2: Initialize Terminal (requires StripeTerminal SDK)
+        // Uncomment when SDK is added:
+        /*
+        Terminal.setTokenProvider(self)
+
+        let config = LocalMobileDiscoveryConfiguration(simulated: false)
+        Terminal.shared.discoverReaders(config, delegate: self) { error in
+            if let error = error {
+                self.tapToPayError = error.localizedDescription
+            }
+        }
+        */
+
+        // For now, mark as ready if we have a token
+        if connectionToken != nil {
+            isTapToPayReady = true
+            print("Debug: StripeManager - Tap to Pay connection token obtained")
+        }
     }
-    
+
+    /// Fetch connection token from Stripe (should be from YOUR backend in production)
+    private func fetchConnectionToken() async throws -> String {
+        // NOTE: In production, this should call YOUR backend server
+        // Your backend should call Stripe's API: POST /v1/terminal/connection_tokens
+        // and return the 'secret' value
+
+        let endpoint = "/terminal/connection_tokens"
+        let url = URL(string: baseURL + endpoint)!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(secretKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw StripeError.requestFailed
+        }
+
+        struct ConnectionTokenResponse: Codable {
+            let secret: String
+            let object: String
+        }
+
+        let tokenResponse = try JSONDecoder().decode(ConnectionTokenResponse.self, from: data)
+        return tokenResponse.secret
+    }
+
+    /// Process a Tap to Pay payment
     func processTapToPayPayment(amount: Int, currency: String = "usd") async throws -> PaymentIntent {
-        // This would use Stripe's Tap to Pay SDK to process contactless payments
-        // For now, we'll create a payment intent
-        return try await createPaymentIntent(amount: amount, currency: currency)
+        // Attempt setup if not ready
+        if !isTapToPayReady {
+            try await setupTapToPay()
+        }
+
+        guard isTapToPayReady else {
+            throw StripeError.tapToPayNotAvailable
+        }
+
+        print("Debug: StripeManager - Processing Tap to Pay payment: \(amount) \(currency)")
+
+        // Step 1: Create a PaymentIntent on the server
+        let paymentIntent = try await createPaymentIntent(amount: amount, currency: currency)
+
+        // Step 2: Collect payment method using Terminal (requires StripeTerminal SDK)
+        // Uncomment when SDK is added:
+        /*
+        let collectConfig = CollectConfiguration()
+        let paymentMethod = try await withCheckedThrowingContinuation { continuation in
+            Terminal.shared.collectPaymentMethod(paymentIntent, collectConfig: collectConfig) { collectResult, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let result = collectResult {
+                    continuation.resume(returning: result)
+                }
+            }
+        }
+
+        // Step 3: Process the payment
+        let processResult = try await withCheckedThrowingContinuation { continuation in
+            Terminal.shared.processPayment(paymentMethod) { processResult, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let result = processResult {
+                    continuation.resume(returning: result)
+                }
+            }
+        }
+        */
+
+        // For now, return the created payment intent
+        // In production, this would return the processed payment intent
+        return paymentIntent
+    }
+
+    /// Check if Tap to Pay is supported on this device
+    func isTapToPaySupported() -> Bool {
+        // Tap to Pay requires:
+        // - iPhone XS or later
+        // - iOS 16.0 or later
+        // - Device in a supported country (US, UK, etc.)
+
+        if #available(iOS 16.0, *) {
+            // Check device model - Tap to Pay requires A12 chip or later
+            // This is a simplified check - real implementation should use StripeTerminal.deviceType
+            return true
+        }
+        return false
     }
 }
+
+// MARK: - Stripe Terminal Token Provider (uncomment when SDK is added)
+/*
+extension StripeManager: ConnectionTokenProvider {
+    func fetchConnectionToken(_ completion: @escaping ConnectionTokenCompletionBlock) {
+        Task {
+            do {
+                let token = try await fetchConnectionToken()
+                completion(token, nil)
+            } catch {
+                completion(nil, error)
+            }
+        }
+    }
+}
+*/
 
 // MARK: - Stripe Models
 struct PaymentIntent: Codable {
@@ -484,7 +639,9 @@ enum StripeError: Error, LocalizedError {
     case requestFailed
     case paymentFailed
     case invalidResponse
-    
+    case tapToPayNotAvailable
+    case tapToPayNotSupported
+
     var errorDescription: String? {
         switch self {
         case .notConfigured:
@@ -495,6 +652,10 @@ enum StripeError: Error, LocalizedError {
             return "Payment processing failed."
         case .invalidResponse:
             return "Invalid response from Stripe API."
+        case .tapToPayNotAvailable:
+            return "Tap to Pay is not available. Please check your Stripe configuration."
+        case .tapToPayNotSupported:
+            return "Tap to Pay requires iPhone XS or later with iOS 16.0+."
         }
     }
 } 

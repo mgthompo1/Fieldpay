@@ -568,17 +568,34 @@ public struct NetSuiteInvoiceWithDisplay: Codable, Identifiable {
     public let tranId: String
     public let trandate: Date
     public let total: Double
+    public let amountRemaining: Double?
+    public let dueDate: Date?
     public let status: String
     public let customerName: String
+    public let customerId: String?
     public let memo: String?
-    
-    public init(id: String, tranId: String, trandate: Date, total: Double, status: String, customerName: String, memo: String?) {
+
+    public init(
+        id: String,
+        tranId: String,
+        trandate: Date,
+        total: Double,
+        amountRemaining: Double? = nil,
+        dueDate: Date? = nil,
+        status: String,
+        customerName: String,
+        customerId: String? = nil,
+        memo: String?
+    ) {
         self.id = id
         self.tranId = tranId
         self.trandate = trandate
         self.total = total
+        self.amountRemaining = amountRemaining
+        self.dueDate = dueDate
         self.status = status
         self.customerName = customerName
+        self.customerId = customerId
         self.memo = memo
     }
 }
@@ -1898,6 +1915,44 @@ public struct NetSuiteInvoiceLineItem: Codable {
 }
 
 public struct NetSuiteCustomFieldList: Codable { }
+
+// MARK: - Invoice Update Request
+
+/// Request model for updating an existing invoice in NetSuite
+public struct NetSuiteInvoiceUpdateRequest: Codable {
+    public let memo: String?
+    public let dueDate: String?
+    public let status: String?
+    public let itemList: NetSuiteInvoiceItemList?
+
+    public init(
+        memo: String? = nil,
+        dueDate: String? = nil,
+        status: String? = nil,
+        itemList: NetSuiteInvoiceItemList? = nil
+    ) {
+        self.memo = memo
+        self.dueDate = dueDate
+        self.status = status
+        self.itemList = itemList
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case memo
+        case dueDate
+        case status
+        case itemList = "item"
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        // Only encode non-nil values
+        if let memo = memo { try container.encode(memo, forKey: .memo) }
+        if let dueDate = dueDate { try container.encode(dueDate, forKey: .dueDate) }
+        if let status = status { try container.encode(status, forKey: .status) }
+        if let itemList = itemList { try container.encode(itemList, forKey: .itemList) }
+    }
+}
 
 // MARK: - NetSuite Types
 

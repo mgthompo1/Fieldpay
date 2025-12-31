@@ -1446,11 +1446,52 @@ class NetSuiteAPI: ObservableObject {
     
     /// Fetch invoices with display values using BUILTIN.DF for customer names
     func fetchInvoicesWithDisplayValues() async throws -> [NetSuiteInvoiceWithDisplay] {
-        let query = SuiteQLQuery.invoicesWithDisplayValues.query
+        // Default: fetch first 1000 invoices
+        return try await fetchInvoicesWithDisplayValuesPaginated(limit: 1000, offset: 0).invoices
+    }
+
+    /// Paginated invoice fetch with server-side pagination
+    /// - Parameters:
+    ///   - limit: Maximum number of invoices to fetch (1-1000)
+    ///   - offset: Starting position for pagination
+    ///   - statusFilter: Optional status filter ("Open", "Paid In Full", etc.)
+    /// - Returns: A tuple of invoices and whether there are more results
+    func fetchInvoicesWithDisplayValuesPaginated(
+        limit: Int = 50,
+        offset: Int = 0,
+        statusFilter: String? = nil
+    ) async throws -> (invoices: [NetSuiteInvoiceWithDisplay], hasMore: Bool, totalCount: Int?) {
+        // Build paginated query with optional status filter
+        var query = """
+            SELECT
+                t.id AS InvoiceID,
+                t.tranid AS InvoiceNumber,
+                t.trandate AS InvoiceDate,
+                t.foreigntotal AS TotalAmount,
+                t.foreignamountremaining AS AmountRemaining,
+                t.duedate AS DueDate,
+                BUILTIN.DF(t.status) AS StatusDisplay,
+                BUILTIN.DF(t.entity) AS CustomerName,
+                t.entity AS CustomerID,
+                t.memo AS InvoiceMemo
+            FROM transaction t
+            WHERE t.type = 'CustInvc'
+            """
+
+        if let status = statusFilter, !status.isEmpty {
+            let safeStatus = SuiteQLHelper.escape(status)
+            query += " AND BUILTIN.DF(t.status) = '\(safeStatus)'"
+        }
+
+        query += """
+            ORDER BY t.trandate DESC
+            LIMIT \(min(limit, 1000)) OFFSET \(max(0, offset))
+            """
+
         let resource = NetSuiteResource.suiteQL(query: query)
         let response: SuiteQLResponse = try await performWithTokenRetry(resource, responseType: SuiteQLResponse.self)
-        
-        return response.items.compactMap { row in
+
+        let invoices = response.items.compactMap { row -> NetSuiteInvoiceWithDisplay? in
             guard let id = row.values["InvoiceID"],
                   let tranId = row.values["InvoiceNumber"],
                   let dateStr = row.values["InvoiceDate"],
@@ -1458,20 +1499,53 @@ class NetSuiteAPI: ObservableObject {
                   let status = row.values["StatusDisplay"],
                   let customerName = row.values["CustomerName"],
                   let memo = row.values["InvoiceMemo"] else { return nil }
-            
+
             let date = NetSuiteDateParser.parseDate(dateStr) ?? Date()
             let total = Double(totalStr) ?? 0.0
-            
+            let remaining = Double(row.values["AmountRemaining"] ?? totalStr) ?? total
+            let dueDate = NetSuiteDateParser.parseDate(row.values["DueDate"])
+            let customerId = row.values["CustomerID"]
+
             return NetSuiteInvoiceWithDisplay(
                 id: id,
                 tranId: tranId,
                 trandate: date,
                 total: total,
+                amountRemaining: remaining,
+                dueDate: dueDate,
                 status: status,
                 customerName: customerName,
+                customerId: customerId,
                 memo: memo
             )
         }
+
+        // Determine if there are more results
+        // If we got exactly `limit` items, there might be more
+        let hasMore = invoices.count >= limit
+
+        return (invoices, hasMore, nil)
+    }
+
+    /// Get total invoice count for a given status filter
+    func getInvoiceCount(statusFilter: String? = nil) async throws -> Int {
+        var query = "SELECT COUNT(*) AS cnt FROM transaction t WHERE t.type = 'CustInvc'"
+
+        if let status = statusFilter, !status.isEmpty {
+            let safeStatus = SuiteQLHelper.escape(status)
+            query += " AND BUILTIN.DF(t.status) = '\(safeStatus)'"
+        }
+
+        let resource = NetSuiteResource.suiteQL(query: query)
+        let response: SuiteQLResponse = try await performWithTokenRetry(resource, responseType: SuiteQLResponse.self)
+
+        if let row = response.items.first,
+           let countStr = row.values["cnt"],
+           let count = Int(countStr) {
+            return count
+        }
+
+        return 0
     }
     
     /// Fetch payments with display values using BUILTIN.DF for customer names
@@ -1825,6 +1899,48 @@ class NetSuiteAPI: ObservableObject {
     func createInvoice(request: NetSuiteInvoiceCreationRequest) async throws -> NetSuiteInvoiceResponse {
         let resource = NetSuiteResource.createInvoice(request: request)
         return try await performWithTokenRetry(resource, responseType: NetSuiteInvoiceResponse.self)
+    }
+
+    /// Update an existing invoice in NetSuite
+    func updateInvoice(invoiceId: String, updates: NetSuiteInvoiceUpdateRequest) async throws -> NetSuiteInvoiceResponse {
+        try await validateTokenBeforeRequest()
+
+        // Validate invoice ID
+        guard let safeId = SuiteQLHelper.escapeNumericId(invoiceId) else {
+            throw NetSuiteError.invalidResponse
+        }
+
+        let url = URL(string: baseURL + "/record/v1/invoice/\(safeId)")!
+        var request = createAuthenticatedRequest(for: .invoiceDetail(id: invoiceId), overrideURL: url)
+        request.httpMethod = "PATCH"
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        request.setValue("application/vnd.oracle.resource+json; type=singular; charset=UTF-8", forHTTPHeaderField: "Content-Type")
+
+        let body = try encoder.encode(updates)
+        request.httpBody = body
+
+        do {
+            let (data, _) = try await sendWithBackoff(request)
+            return try decoder.decode(NetSuiteInvoiceResponse.self, from: data)
+        } catch let e as NetSuiteHTTPError where e.status == 401 {
+            try await handle401Response()
+            let (data, _) = try await sendWithBackoff(request)
+            return try decoder.decode(NetSuiteInvoiceResponse.self, from: data)
+        }
+    }
+
+    /// Mark an invoice as paid by applying a payment
+    func markInvoiceAsPaid(invoiceId: String, paymentAmount: Decimal, customerId: String) async throws -> Payment {
+        let payment = Payment(
+            amount: paymentAmount,
+            currency: "USD",
+            status: .succeeded,
+            paymentMethod: .cash,
+            customerId: customerId,
+            invoiceId: invoiceId,
+            description: "Payment for invoice \(invoiceId)"
+        )
+        return try await createPayment(payment)
     }
 
     // MARK: - Debug Helpers

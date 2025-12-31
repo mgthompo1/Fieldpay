@@ -19,37 +19,51 @@ struct WindcaveTransaction: Codable {
 
 class WindcaveManager: ObservableObject {
     static let shared = WindcaveManager()
-    
+
     private var restApiUsername: String = ""
     private var restApiKey: String = ""
     private let baseURL = "https://sec.windcave.com"
-    
+    private let keychain = KeychainHelper.shared
+
     @Published var isConfigured = false
     @Published var isConnected = false
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
+
     private init() {
+        // Migrate any existing credentials from UserDefaults to Keychain (one-time)
+        keychain.migrateWindcaveCredentials()
+        // Load from Keychain
         loadConfiguration()
     }
-    
+
     // MARK: - Configuration
     func updateConfiguration(username: String, apiKey: String) {
         self.restApiUsername = username
         self.restApiKey = apiKey
-        
-        // Store in UserDefaults
-        UserDefaults.standard.set(username, forKey: "windcave_username")
-        UserDefaults.standard.set(apiKey, forKey: "windcave_api_key")
-        
+
+        // Store securely in Keychain (not UserDefaults)
+        keychain.windcaveUsername = username
+        keychain.windcaveApiKey = apiKey
+
         self.isConfigured = !username.isEmpty && !apiKey.isEmpty
         print("Windcave configured with username: \(username)")
     }
-    
+
     private func loadConfiguration() {
-        restApiUsername = UserDefaults.standard.string(forKey: "windcave_username") ?? ""
-        restApiKey = UserDefaults.standard.string(forKey: "windcave_api_key") ?? ""
+        restApiUsername = keychain.windcaveUsername ?? ""
+        restApiKey = keychain.windcaveApiKey ?? ""
         isConfigured = !restApiUsername.isEmpty && !restApiKey.isEmpty
+    }
+
+    /// Clear all Windcave credentials from Keychain
+    func clearCredentials() {
+        keychain.windcaveUsername = nil
+        keychain.windcaveApiKey = nil
+        restApiUsername = ""
+        restApiKey = ""
+        isConfigured = false
+        isConnected = false
     }
     
     // MARK: - Authentication

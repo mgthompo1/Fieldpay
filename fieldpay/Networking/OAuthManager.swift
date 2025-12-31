@@ -581,59 +581,116 @@ class OAuthManager: ObservableObject {
         guard let refreshToken = refreshToken else {
             throw OAuthError.noRefreshToken
         }
-        
-        _ = try await refreshAccessToken(refreshToken: refreshToken)
+
+        _ = try await refreshAccessTokenWithRetry(refreshToken: refreshToken)
     }
-    
+
+    /// Refresh access token with exponential backoff retry logic
+    func refreshAccessTokenWithRetry(refreshToken: String, maxRetries: Int = 3) async throws -> OAuthTokenResponse {
+        var lastError: Error?
+        let retryDelays: [UInt64] = [1_000_000_000, 2_000_000_000, 5_000_000_000] // 1s, 2s, 5s
+
+        for attempt in 0..<maxRetries {
+            do {
+                print("Debug: Token refresh attempt \(attempt + 1)/\(maxRetries)")
+                let result = try await refreshAccessToken(refreshToken: refreshToken)
+                print("Debug: Token refresh successful on attempt \(attempt + 1)")
+                return result
+            } catch {
+                lastError = error
+                print("Debug: Token refresh attempt \(attempt + 1) failed: \(error)")
+
+                // Don't retry on certain errors
+                if case OAuthError.notConfigured = error {
+                    throw error
+                }
+                if case OAuthError.noRefreshToken = error {
+                    throw error
+                }
+
+                // Wait before retrying (exponential backoff)
+                if attempt < maxRetries - 1 {
+                    let delay = retryDelays[min(attempt, retryDelays.count - 1)]
+                    print("Debug: Waiting \(Double(delay) / 1_000_000_000)s before retry...")
+                    try? await Task.sleep(nanoseconds: delay)
+                }
+            }
+        }
+
+        print("Debug: All token refresh attempts failed")
+        throw lastError ?? OAuthError.tokenRefreshFailed
+    }
+
     func refreshAccessToken(refreshToken: String) async throws -> OAuthTokenResponse {
         guard !clientId.isEmpty && !accountId.isEmpty else {
             throw OAuthError.notConfigured
         }
-        
+
         // NetSuite OAuth 2.0 token endpoint for refresh - CORRECT FORMAT
         // Format: https://{account-id}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token
         let url = "https://\(accountId).suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token"
-        
+
         var request = URLRequest(url: URL(string: url)!)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        
+        request.timeoutInterval = 30 // 30 second timeout
+
         // Basic Auth with Base64 encoded clientid:clientsecret
         let credentials = "\(clientId):\(clientSecret)"
         let credentialsData = credentials.data(using: .utf8)!
         let base64Credentials = credentialsData.base64EncodedString()
         request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
-        
+
         // URL encode the parameters properly
         let bodyParameters = [
             "grant_type": "refresh_token",
             "refresh_token": refreshToken
         ]
-        
+
         let bodyString = bodyParameters.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0.value)" }.joined(separator: "&")
         request.httpBody = bodyString.data(using: .utf8)
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw OAuthError.tokenRefreshFailed
         }
-        
+
+        // Handle specific HTTP error codes
+        switch httpResponse.statusCode {
+        case 200:
+            break // Success
+        case 400:
+            print("Debug: Token refresh failed - Bad request (invalid refresh token?)")
+            throw OAuthError.tokenRefreshFailed
+        case 401:
+            print("Debug: Token refresh failed - Unauthorized (credentials invalid)")
+            throw OAuthError.authenticationFailed
+        case 429:
+            print("Debug: Token refresh failed - Rate limited")
+            throw OAuthError.tokenRefreshFailed
+        case 500...599:
+            print("Debug: Token refresh failed - Server error (\(httpResponse.statusCode))")
+            throw OAuthError.tokenRefreshFailed
+        default:
+            print("Debug: Token refresh failed - HTTP \(httpResponse.statusCode)")
+            throw OAuthError.tokenRefreshFailed
+        }
+
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-        
+
         DispatchQueue.main.async {
             self.accessToken = tokenResponse.accessToken
             self.refreshToken = tokenResponse.refreshToken
         }
-        
+
         // Store updated tokens
         try await storeTokens(accessToken: tokenResponse.accessToken, refreshToken: tokenResponse.refreshToken)
-        
+
         // Configure NetSuiteAPI with the updated tokens
         NetSuiteAPI.shared.configure(accountId: accountId, accessToken: tokenResponse.accessToken)
         print("Debug: NetSuiteAPI reconfigured with updated access token")
-        
+
         let expiryDate = Date().addingTimeInterval(TimeInterval(tokenResponse.expiresIn))
         return OAuthTokenResponse(
             accessToken: tokenResponse.accessToken,
