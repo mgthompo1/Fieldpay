@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customrole scriptid="customrole_fieldpay_user">
+  <name>FieldPay User</name>
+  <centertype>BASIC</centertype>
+  <coreadminpermission>NONE</coreadminpermission>
+  <issalesrole>T</issalesrole>
+  <issupportrole>F</issupportrole>
+  <iswebserviceonlyrole>F</iswebserviceonlyrole>
+  <permissions>
+    <!-- Customer Records -->
+    <permission>
+      <permkey>LIST_CUSTJOB</permkey>
+      <permlevel>FULL</permlevel>
+    </permission>
+    <!-- Invoice Records -->
+    <permission>
+      <permkey>TRAN_CUSTINVC</permkey>
+      <permlevel>FULL</permlevel>
+    </permission>
+    <!-- Sales Order Records -->
+    <permission>
+      <permkey>TRAN_SALESORD</permkey>
+      <permlevel>FULL</permlevel>
+    </permission>
+    <!-- Customer Payment Records -->
+    <permission>
+      <permkey>TRAN_CUSTPYMT</permkey>
+      <permlevel>FULL</permlevel>
+    </permission>
+    <!-- Customer Deposit Records -->
+    <permission>
+      <permkey>TRAN_CUSTDEP</permkey>
+      <permlevel>FULL</permlevel>
+    </permission>
+    <!-- Items (for invoice line items) -->
+    <permission>
+      <permkey>LIST_ITEM</permkey>
+      <permlevel>VIEW</permlevel>
+    </permission>
+    <!-- Subsidiaries (for multi-subsidiary accounts) -->
+    <permission>
+      <permkey>LIST_SUBSIDIARY</permkey>
+      <permlevel>VIEW</permlevel>
+    </permission>
+    <!-- Locations -->
+    <permission>
+      <permkey>LIST_LOCATION</permkey>
+      <permlevel>VIEW</permlevel>
+    </permission>
+    <!-- Currency -->
+    <permission>
+      <permkey>LIST_CURRENCY</permkey>
+      <permlevel>VIEW</permlevel>
+    </permission>
+    <!-- REST Web Services Access -->
+    <permission>
+      <permkey>ADMI_RESTWEBSERVICES</permkey>
+      <permlevel>FULL</permlevel>
+    </permission>
+    <!-- SuiteQL -->
+    <permission>
+      <permkey>ADMI_SUITEQL</permkey>
+      <permlevel>FULL</permlevel>
+    </permission>
+    <!-- Log in using OAuth 2.0 Access Tokens -->
+    <permission>
+      <permkey>ADMI_OAUTH2TOKENLOGIN</permkey>
+      <permlevel>FULL</permlevel>
+    </permission>
+    <!-- Saved Searches -->
+    <permission>
+      <permkey>LIST_SAVEDSEARCH</permkey>
+      <permlevel>VIEW</permlevel>
+    </permission>
+  </permissions>
+</customrole>

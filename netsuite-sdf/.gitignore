@@ -1,0 +1,22 @@
+# SuiteCloud CLI authentication files (contain credentials)
+.suitecloud-sdk/
+.credentials/
+authid.json
+
+# Generated credentials file (contains secrets!)
+fieldpay_credentials.txt
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
