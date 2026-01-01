@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest projecttype="ACCOUNTCUSTOMIZATION">
   <projectname>FieldPay</projectname>
-  <projectversion>1.0.0</projectversion>
   <frameworkversion>1.0</frameworkversion>
   <dependencies>
     <features>
