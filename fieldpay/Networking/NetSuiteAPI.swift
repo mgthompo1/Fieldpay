@@ -573,71 +573,83 @@ class NetSuiteAPI: ObservableObject {
     }
     
     private func fetchInvoiceDetailViaSuiteQL(id: String) async throws -> NetSuiteInvoiceRecord {
-        // Enhanced SuiteQL query to get complete invoice information including line items
-        let invoiceQuery = """
-        SELECT 
-            t.id, 
-            t.tranid, 
-            t.entity, 
-            t.total, 
-            t.trandate, 
-            t.status, 
-            t.memo, 
-            t.duedate, 
-            t.amountremaining, 
-            t.amountpaid,
-            t.createddate,
-            t.lastmodifieddate,
-            t.currency,
-            t.location,
-            t.subsidiary,
-            t.terms,
-            t.source,
-            t.originator
-        FROM transaction t 
-        WHERE t.id = '\(id)' AND t.type = 'Invoice'
-        LIMIT 1
+        // Validate ID to prevent SQL injection
+        guard let safeId = SuiteQLHelper.escapeNumericId(id) else {
+            throw NetSuiteError.invalidResponse
+        }
+
+        // OPTIMIZED: Single consolidated query with JOIN for invoice + line items + customer
+        // This replaces 3 separate API calls with 1
+        let consolidatedQuery = """
+        SELECT
+            t.id AS InvoiceID,
+            t.tranid AS InvoiceNumber,
+            t.entity AS CustomerID,
+            BUILTIN.DF(t.entity) AS CustomerName,
+            t.foreigntotal AS Total,
+            t.trandate AS TranDate,
+            BUILTIN.DF(t.status) AS Status,
+            t.memo AS Memo,
+            t.duedate AS DueDate,
+            t.foreignamountremaining AS AmountRemaining,
+            t.foreignamountpaid AS AmountPaid,
+            t.lastmodifieddate AS LastModified,
+            tl.linesequencenumber AS LineNum,
+            tl.item AS ItemID,
+            BUILTIN.DF(tl.item) AS ItemName,
+            tl.quantity AS Quantity,
+            tl.rate AS Rate,
+            tl.foreignamount AS LineAmount,
+            tl.memo AS LineMemo
+        FROM transaction t
+        LEFT JOIN transactionline tl ON t.id = tl.transaction AND tl.mainline = 'F'
+        WHERE t.id = '\(safeId)' AND t.type = 'CustInvc'
+        ORDER BY tl.linesequencenumber
         """
-        let invoiceResource = NetSuiteResource.suiteQL(query: invoiceQuery)
-        let invoiceResponse: SuiteQLResponse = try await performWithTokenRetry(invoiceResource, responseType: SuiteQLResponse.self)
-        guard let row = invoiceResponse.items.first else { throw NetSuiteError.invalidResponse }
-        
-        // Enhanced line item query with better item information
-        let lineItemQuery = """
-        SELECT 
-            il.tranid,
-            il.linesequencenumber,
-            il.item,
-            il.quantity,
-            il.rate,
-            il.amount,
-            il.memo,
-            il.description,
-            i.itemid,
-            i.displayname,
-            i.description as item_description,
-            i.itemtype
-        FROM transactionline il
-        LEFT JOIN item i ON il.item = i.id
-        WHERE il.transaction = '\(id)'
-        ORDER BY il.linesequencenumber
-        """
-        let lineResource = NetSuiteResource.suiteQL(query: lineItemQuery)
-        let lineResp: SuiteQLResponse = try await performWithTokenRetry(lineResource, responseType: SuiteQLResponse.self)
-        
-        let _ = lineResp.items.map { row in
-            let itemId = row.values["column2"] ?? ""
-            let itemName = row.values["column9"] ?? row.values["column8"] ?? "Unknown Item"
-            let description = row.values["column7"] ?? row.values["column10"] ?? itemName
-            let itemType = row.values["column11"] ?? "Service"
-            
+
+        let resource = NetSuiteResource.suiteQL(query: consolidatedQuery)
+        let response: SuiteQLResponse = try await performWithTokenRetry(resource, responseType: SuiteQLResponse.self)
+
+        guard let firstRow = response.items.first else {
+            throw NetSuiteError.invalidResponse
+        }
+
+        // Extract invoice header from first row
+        let invoiceId = firstRow.values["InvoiceID"] ?? id
+        let tranId = firstRow.values["InvoiceNumber"] ?? ""
+        let customerId = firstRow.values["CustomerID"] ?? ""
+        let customerName = firstRow.values["CustomerName"] ?? ""
+        let total = Double(firstRow.values["Total"] ?? "0") ?? 0.0
+        let tranDate = NetSuiteDateParser.parseDate(firstRow.values["TranDate"]) ?? Date()
+        let status = firstRow.values["Status"] ?? ""
+        let memo = firstRow.values["Memo"]
+
+        // Cache customer name for future use
+        if !customerId.isEmpty && !customerName.isEmpty {
+            await CustomerNameCache.shared.preload([customerId: customerName])
+        }
+
+        // Parse line items from all rows (each row is a line item)
+        let lineItems: [LineItem] = response.items.compactMap { row in
+            guard let lineNumStr = row.values["LineNum"],
+                  let lineNum = Int(lineNumStr) else {
+                return nil
+            }
+
+            let itemId = row.values["ItemID"] ?? ""
+            let itemName = row.values["ItemName"] ?? "Unknown Item"
+            let quantity = Double(row.values["Quantity"] ?? "0") ?? 0.0
+            let rate = Double(row.values["Rate"] ?? "0") ?? 0.0
+            let amount = Double(row.values["LineAmount"] ?? "0") ?? 0.0
+            let lineMemo = row.values["LineMemo"]
+
             return LineItem(
-                line: Int(row.values["column1"] ?? row.values["linesequencenumber"] ?? "0"),
-                description: description,
-                item: Reference(id: itemId, refName: itemName, type: itemType),
-                quantity: Double(row.values["column3"] ?? "0"),
-                rate: Double(row.values["column4"] ?? "0"),
-                amount: Double(row.values["column5"] ?? "0"),
+                line: lineNum,
+                description: lineMemo ?? itemName,
+                item: Reference(id: itemId, refName: itemName, type: "inventoryItem"),
+                quantity: quantity,
+                rate: rate,
+                amount: amount,
                 taxCode: nil,
                 grossAmt: nil,
                 netAmount: nil,
@@ -647,20 +659,19 @@ class NetSuiteAPI: ObservableObject {
                 customFieldList: nil
             )
         }
-        
-        // Enhanced customer information query
-        let customerId = row.values["column2"] ?? ""
-        let _ = await fetchCustomerName(customerId: customerId)
-        
+
         let record = NetSuiteInvoiceRecord(
-            id: row.values["column0"] ?? id,
-            tranId: row.values["column1"] ?? "",
-            trandate: NetSuiteDateParser.parseDate(row.values["column4"]) ?? Date(),
-            total: Double(row.values["column3"] ?? "0") ?? 0.0,
+            id: invoiceId,
+            tranId: tranId,
+            trandate: tranDate,
+            total: total,
             entity: customerId,
-            status: row.values["column5"] ?? "",
-            memo: row.values["column6"] ?? ""
+            status: status,
+            memo: memo,
+            lineItems: lineItems,
+            customerName: customerName
         )
+
         return record
     }
     

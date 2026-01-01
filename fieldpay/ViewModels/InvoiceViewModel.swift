@@ -77,7 +77,101 @@ class InvoiceViewModel: ObservableObject {
         isFetchingDetails = false
         errorMessage = nil
     }
-    
+
+    // MARK: - Incremental Sync
+
+    /// Perform incremental sync - only fetch invoices modified since last sync
+    /// Returns the number of new/updated records
+    @discardableResult
+    func performIncrementalSync() async -> Int {
+        let syncManager = IncrementalSyncManager.shared
+        syncManager.beginSync(for: .invoices)
+
+        do {
+            let query = syncManager.buildInvoiceSyncQuery(limit: syncManager.maxBatchSize)
+            let resource = NetSuiteResource.suiteQL(query: query)
+            let response: SuiteQLResponse = try await (api as? NetSuiteAPI ?? NetSuiteAPI.shared)
+                .fetch(resource, type: SuiteQLResponse.self)
+
+            var updatedCount = 0
+
+            for row in response.items {
+                guard let id = row.values["InvoiceID"],
+                      let tranId = row.values["InvoiceNumber"],
+                      let dateStr = row.values["InvoiceDate"],
+                      let totalStr = row.values["TotalAmount"],
+                      let status = row.values["StatusDisplay"],
+                      let customerName = row.values["CustomerName"] else {
+                    continue
+                }
+
+                let date = NetSuiteDateParser.parseDate(dateStr) ?? Date()
+                let total = Double(totalStr) ?? 0.0
+                let remaining = Double(row.values["AmountRemaining"] ?? totalStr) ?? total
+                let dueDate = NetSuiteDateParser.parseDate(row.values["DueDate"])
+                let customerId = row.values["CustomerID"] ?? ""
+                let memo = row.values["InvoiceMemo"]
+
+                let invoice = Invoice(
+                    id: id,
+                    invoiceNumber: tranId,
+                    customerId: customerId,
+                    customerName: customerName,
+                    amount: Decimal(total),
+                    balance: Decimal(remaining),
+                    status: parseNetSuiteStatus(status),
+                    dueDate: dueDate,
+                    createdDate: date,
+                    netSuiteId: id,
+                    items: [],
+                    notes: memo
+                )
+
+                // Update or insert
+                if let existingIdx = allInvoices.firstIndex(where: { $0.id == id }) {
+                    allInvoices[existingIdx] = invoice
+                } else {
+                    allInvoices.append(invoice)
+                    seenIds.insert(id)
+                }
+                invoiceCache[id] = invoice
+                updatedCount += 1
+
+                // Cache customer name
+                if !customerId.isEmpty && !customerName.isEmpty {
+                    await CustomerNameCache.shared.preload([customerId: customerName])
+                }
+            }
+
+            // Sort and update UI
+            invoices = allInvoices.sorted(by: { $0.createdDate > $1.createdDate })
+
+            syncManager.markSyncCompleted(for: .invoices, recordCount: updatedCount)
+            print("InvoiceViewModel: Incremental sync completed - \(updatedCount) records updated")
+
+            return updatedCount
+
+        } catch {
+            syncManager.markSyncFailed(for: .invoices, error: error)
+            print("InvoiceViewModel: Incremental sync failed - \(error)")
+            return 0
+        }
+    }
+
+    /// Check if we should do incremental or full sync
+    func refreshInvoices() async {
+        let syncManager = IncrementalSyncManager.shared
+
+        if syncManager.shouldDoFullSync(for: .invoices) {
+            // Full sync - reset and load from scratch
+            resetPagination()
+            await loadNextPage()
+        } else {
+            // Incremental sync - just get changes
+            await performIncrementalSync()
+        }
+    }
+
     func loadNextPage(status: String? = nil) async {
         guard !isLoading, hasMore else { return }
         if status != activeStatus { // user changed the filter — restart
@@ -279,53 +373,18 @@ class InvoiceViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Helper Methods
+    // MARK: - Helper Methods (using CustomerNameCache)
+
+    /// Fetch customer name using the global cache
     private func fetchCustomerName(customerId: String) async -> String {
         guard !customerId.isEmpty else { return "Customer \(customerId)" }
-        // Use safe ID escaping to prevent SQL injection
-        guard let safeId = SuiteQLHelper.escapeNumericId(customerId) else {
-            print("Invalid customer ID format: \(customerId)")
-            return "Customer \(customerId)"
-        }
-        do {
-            let q = "SELECT id, entityid, companyname FROM customer WHERE id = '\(safeId)' LIMIT 1"
-            let resource = NetSuiteResource.suiteQL(query: q)
-            let resp: SuiteQLResponse = try await api.fetch(resource, type: SuiteQLResponse.self)
-            if let row = resp.items.first {
-                let entityId = row.values["column1"] ?? ""
-                let company = row.values["column2"] ?? ""
-                return !entityId.isEmpty ? entityId : (!company.isEmpty ? company : "Customer \(customerId)")
-            }
-        } catch {
-            print("Failed to fetch customer name for \(customerId): \(error)")
-        }
-        return "Customer \(customerId)"
+        return await CustomerNameCache.shared.getCustomerName(customerId: customerId)
     }
 
-    /// Batch fetch customer names for a set of customer IDs
+    /// Batch fetch customer names using the global cache
     private func fetchCustomerNamesBatch(customerIds: [String]) async -> [String: String] {
         guard !customerIds.isEmpty else { return [:] }
-        // Use safe IN clause building to prevent SQL injection
-        guard let inClause = SuiteQLHelper.buildInClause(ids: customerIds) else {
-            print("Invalid customer IDs provided for batch fetch")
-            return [:]
-        }
-        let q = "SELECT id, entityid, companyname FROM customer WHERE id IN (\(inClause))"
-        let resource = NetSuiteResource.suiteQL(query: q)
-        do {
-            let resp: SuiteQLResponse = try await api.fetch(resource, type: SuiteQLResponse.self)
-            var map: [String:String] = [:]
-            for row in resp.items {
-                let id = row.values["column0"] ?? ""
-                let entityId = row.values["column1"] ?? ""
-                let company = row.values["column2"] ?? ""
-                map[id] = !entityId.isEmpty ? entityId : (!company.isEmpty ? company : "Customer \(id)")
-            }
-            return map
-        } catch {
-            print("Failed to batch fetch customer names: \(error)")
-            return [:]
-        }
+        return await CustomerNameCache.shared.getCustomerNames(customerIds: customerIds)
     }
     
     private static func parseNetSuiteDate(_ dateString: String?) -> Date? {

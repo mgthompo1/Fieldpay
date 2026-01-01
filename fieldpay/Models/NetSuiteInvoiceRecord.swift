@@ -260,6 +260,51 @@ struct NetSuiteInvoiceRecord: Codable {
         self.totalCostEstimate = nil
         self.subtotal = nil
     }
+
+    /// Extended initializer for consolidated SuiteQL queries with line items and customer name
+    init(id: String, tranId: String, trandate: Date, total: Double, entity: String, status: String, memo: String?, lineItems: [LineItem], customerName: String) {
+        self.id = id
+        self.tranId = tranId
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        self.tranDate = formatter.string(from: trandate)
+        self.total = total
+        // Store customer name in the entity reference's refName field
+        self.entity = EntityReference(id: entity, refName: customerName, type: nil)
+        self.status = InvoiceStatus.parse(status)
+        self.memo = memo
+        // Store line items
+        self.item = ItemList(item: lineItems)
+        self.dueDate = nil
+        self.currency = nil
+        self.createdDate = nil
+        self.lastModifiedDate = nil
+        self.balance = nil
+        self.location = nil
+        self.customFieldList = nil
+        self.amountRemaining = nil
+        self.amountPaid = nil
+        self.billAddress = nil
+        self.shipAddress = nil
+        self.email = nil
+        self.customForm = nil
+        self.subsidiary = nil
+        self.terms = nil
+        self.postingPeriod = nil
+        self.source = nil
+        self.originator = nil
+        self.toBeEmailed = nil
+        self.toBeFaxed = nil
+        self.toBePrinted = nil
+        self.shipDate = nil
+        self.shipIsResidential = nil
+        self.shipOverride = nil
+        self.estGrossProfit = nil
+        self.estGrossProfitPercent = nil
+        self.exchangeRate = nil
+        self.totalCostEstimate = nil
+        self.subtotal = nil
+    }
 }
 
 // MARK: - Convenience Extensions
