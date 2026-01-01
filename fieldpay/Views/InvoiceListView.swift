@@ -40,29 +40,32 @@ struct InvoiceListView: View {
 
     var body: some View {
         NavigationView {
-            VStack {
+            ZStack {
+                FieldPayBackground()
+                
+                VStack {
                 if viewModel.isLoading {
                     VStack(spacing: 16) {
                         ProgressView("Loading invoices...")
                             .scaleEffect(1.2)
                         Text("Please wait while we fetch your invoices")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.caption)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemBackground))
+                    .fieldPayCard(padding: 24, cornerRadius: 18)
                     .allowsHitTesting(false)
                 } else if let errorMessage = viewModel.errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 48))
-                            .foregroundColor(.orange)
+                            .foregroundColor(FieldPayTheme.highlight)
                         Text("Unable to Load Invoices")
-                            .font(.title2)
-                            .fontWeight(.semibold)
+                            .font(FieldPayFont.title2)
+                            .foregroundColor(FieldPayTheme.ink)
                         Text(errorMessage)
-                            .font(.body)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.body)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                         Button("Try Again") {
@@ -75,7 +78,7 @@ struct InvoiceListView: View {
                         .controlSize(.large)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemBackground))
+                    .fieldPayCard(padding: 24, cornerRadius: 18)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 12) {
@@ -85,18 +88,18 @@ struct InvoiceListView: View {
                                     if let status = selectedStatus {
                                         HStack {
                                             Text(status.displayName)
-                                                .font(.caption)
+                                                .font(FieldPayFont.caption)
                                                 .padding(.horizontal, 8)
                                                 .padding(.vertical, 4)
-                                                .background(Color.blue.opacity(0.2))
-                                                .foregroundColor(.blue)
-                                                .cornerRadius(8)
+                                                .background(FieldPayTheme.accent.opacity(0.2))
+                                                .foregroundColor(FieldPayTheme.accent)
+                                                .clipShape(Capsule())
 
                                             Button(action: {
                                                 selectedStatus = nil
                                             }) {
                                                 Image(systemName: "xmark.circle.fill")
-                                                    .foregroundColor(.blue)
+                                                    .foregroundColor(FieldPayTheme.accent)
                                             }
                                         }
                                     }
@@ -104,18 +107,18 @@ struct InvoiceListView: View {
                                     if let customer = selectedCustomerForSearch {
                                         HStack {
                                             Text("Customer: \(customer.name)")
-                                                .font(.caption)
+                                                .font(FieldPayFont.caption)
                                                 .padding(.horizontal, 8)
                                                 .padding(.vertical, 4)
-                                                .background(Color.green.opacity(0.2))
-                                                .foregroundColor(.green)
-                                                .cornerRadius(8)
+                                                .background(FieldPayTheme.success.opacity(0.2))
+                                                .foregroundColor(FieldPayTheme.success)
+                                                .clipShape(Capsule())
 
                                             Button(action: {
                                                 selectedCustomerForSearch = nil
                                             }) {
                                                 Image(systemName: "xmark.circle.fill")
-                                                    .foregroundColor(.green)
+                                                    .foregroundColor(FieldPayTheme.success)
                                             }
                                         }
                                     }
@@ -126,8 +129,8 @@ struct InvoiceListView: View {
                                         selectedStatus = nil
                                         selectedCustomerForSearch = nil
                                     }
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .font(FieldPayFont.caption)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                                 }
                                 .padding(.horizontal)
                             }
@@ -149,7 +152,7 @@ struct InvoiceListView: View {
                                         Image(systemName: "arrow.down.circle")
                                         Text("Load More")
                                     }
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(FieldPayTheme.accent)
                                     .padding()
                                 }
                             }
@@ -160,8 +163,8 @@ struct InvoiceListView: View {
                                     ProgressView()
                                         .scaleEffect(0.8)
                                     Text("Loading more invoices...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .font(FieldPayFont.caption)
+                                        .foregroundColor(FieldPayTheme.inkMuted)
                                 }
                                 .padding()
                             }
@@ -193,36 +196,39 @@ struct InvoiceListView: View {
                             VStack(spacing: 12) {
                                 Image(systemName: "magnifyingglass")
                                     .font(.system(size: 32))
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                                 Text("No invoices found")
-                                    .font(.headline)
+                                    .font(FieldPayFont.headline)
+                                    .foregroundColor(FieldPayTheme.ink)
                                 Text("Try adjusting your search terms")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .font(FieldPayFont.caption)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if filteredInvoices.isEmpty && selectedStatus != nil {
                             VStack(spacing: 12) {
                                 Image(systemName: "doc.text")
                                     .font(.system(size: 32))
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                                 Text("No \(selectedStatus?.displayName.lowercased() ?? "") invoices")
-                                    .font(.headline)
+                                    .font(FieldPayFont.headline)
+                                    .foregroundColor(FieldPayTheme.ink)
                                 Text("Try selecting a different status")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .font(FieldPayFont.caption)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if filteredInvoices.isEmpty && selectedCustomerForSearch != nil {
                             VStack(spacing: 12) {
                                 Image(systemName: "person.crop.circle")
                                     .font(.system(size: 32))
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                                 Text("No invoices for \(selectedCustomerForSearch?.name ?? "this customer")")
-                                    .font(.headline)
+                                    .font(FieldPayFont.headline)
+                                    .foregroundColor(FieldPayTheme.ink)
                                 Text("Try selecting a different customer")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .font(FieldPayFont.caption)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
@@ -278,6 +284,8 @@ struct InvoiceListView: View {
                 )
             }
         }
+    }
+
     }
 
     private var filteredInvoices: [Invoice] {
@@ -397,13 +405,13 @@ struct InvoiceRowView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(invoice.invoiceNumber)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(FieldPayTheme.ink)
                         .accessibilityLabel("Invoice number")
 
                     Text(invoice.customerName)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.callout)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                         .accessibilityLabel("Customer name")
                 }
 
@@ -411,13 +419,13 @@ struct InvoiceRowView: View {
 
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(CurrencyFormatter.shared.format(invoice.amount))
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(FieldPayTheme.ink)
                         .accessibilityLabel("Invoice amount")
 
                     Text("Balance: \(CurrencyFormatter.shared.format(invoice.balance))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                         .accessibilityLabel("Balance due")
                 }
             }
@@ -430,13 +438,13 @@ struct InvoiceRowView: View {
 
                 if let dueDate = invoice.dueDate {
                     Text("Due: \(dueDate, style: .date)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                         .accessibilityLabel("Due date")
                 }
             }
         }
-        .padding(.vertical, 4)
+        .fieldPayCard(padding: 16, cornerRadius: 16)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Invoice \(invoice.invoiceNumber) for \(invoice.customerName), amount \(CurrencyFormatter.shared.format(invoice.amount)), status \(invoice.status.displayName)")
     }
@@ -447,20 +455,20 @@ struct StatusBadge: View {
 
     var body: some View {
         Text(status.displayName)
-            .font(.caption)
+            .font(FieldPayFont.caption)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(statusColor.opacity(0.2))
             .foregroundColor(statusColor)
-            .cornerRadius(8)
+            .clipShape(Capsule())
     }
 
     private var statusColor: Color {
         switch status {
-        case .pending: return .orange
-        case .paid: return .green
-        case .overdue: return .red
-        case .cancelled: return .gray
+        case .pending: return FieldPayTheme.highlight
+        case .paid: return FieldPayTheme.success
+        case .overdue: return FieldPayTheme.danger
+        case .cancelled: return FieldPayTheme.inkMuted
         }
     }
 }
@@ -482,12 +490,12 @@ struct InvoiceDetailView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(currentInvoice.invoiceNumber)
-                                .font(.title)
-                                .fontWeight(.bold)
+                                .font(FieldPayFont.title)
+                                .foregroundColor(FieldPayTheme.ink)
 
                             Text(currentInvoice.customerName)
-                                .font(.headline)
-                                .foregroundColor(.secondary)
+                                .font(FieldPayFont.callout)
+                                .foregroundColor(FieldPayTheme.inkMuted)
                         }
 
                         Spacer()
@@ -501,25 +509,25 @@ struct InvoiceDetailView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Total Amount:")
-                                .fontWeight(.medium)
+                                .font(FieldPayFont.callout)
                             Spacer()
                             Text(CurrencyFormatter.shared.format(currentInvoice.amount))
-                                .fontWeight(.bold)
+                                .font(FieldPayFont.headline)
                         }
 
                         HStack {
                             Text("Balance Due:")
-                                .fontWeight(.medium)
+                                .font(FieldPayFont.callout)
                             Spacer()
                             Text(CurrencyFormatter.shared.format(currentInvoice.balance))
-                                .fontWeight(.bold)
-                                .foregroundColor(currentInvoice.balance > 0 ? .red : .green)
+                                .font(FieldPayFont.headline)
+                                .foregroundColor(currentInvoice.balance > 0 ? FieldPayTheme.danger : FieldPayTheme.success)
                         }
 
                         if let dueDate = currentInvoice.dueDate {
                             HStack {
                                 Text("Due Date:")
-                                    .fontWeight(.medium)
+                                    .font(FieldPayFont.callout)
                                 Spacer()
                                 Text(dueDate, style: .date)
                             }
@@ -527,22 +535,19 @@ struct InvoiceDetailView: View {
 
                         HStack {
                             Text("Created:")
-                                .fontWeight(.medium)
+                                .font(FieldPayFont.callout)
                             Spacer()
                             Text(currentInvoice.createdDate, style: .date)
                         }
                     }
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                .fieldPayCard(padding: 20, cornerRadius: 20)
 
                 // Invoice Items
                 if !currentInvoice.items.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Items")
-                            .font(.headline)
+                            .font(FieldPayFont.headline)
 
                         VStack(spacing: 8) {
                             ForEach(currentInvoice.items, id: \.id) { item in
@@ -550,32 +555,26 @@ struct InvoiceDetailView: View {
                             }
                         }
                     }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .fieldPayCard(padding: 20, cornerRadius: 20)
                 }
 
                 // Notes
                 if let notes = currentInvoice.notes, !notes.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Notes")
-                            .font(.headline)
+                            .font(FieldPayFont.headline)
 
                         Text(notes)
-                            .font(.body)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.body)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                     }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .fieldPayCard(padding: 20, cornerRadius: 20)
                 }
 
                 // Quick Actions
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Quick Actions")
-                        .font(.headline)
+                        .font(FieldPayFont.headline)
 
                     VStack(spacing: 8) {
                         if currentInvoice.status != .paid && currentInvoice.status != .cancelled {

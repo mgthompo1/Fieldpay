@@ -70,7 +70,7 @@ struct ContentView: View {
                 }
                 .tag(4)
         }
-        .accentColor(.blue)
+        .tint(FieldPayTheme.accent)
         .sheet(isPresented: $showingPaymentSheet) {
             PaymentView(viewModel: paymentViewModel, customerViewModel: customerViewModel, settingsViewModel: settingsViewModel)
         }
@@ -120,7 +120,7 @@ struct ModernStatCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: icon)
-                    .font(.title2)
+                    .font(FieldPayFont.title2)
                     .foregroundColor(.white)
                     .frame(width: 40, height: 40)
                     .background(gradient)
@@ -135,24 +135,19 @@ struct ModernStatCard: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(value)
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.metric)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.headline)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
             }
         }
-        .padding(20)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+        .fieldPayCard(padding: 20, cornerRadius: 18)
     }
 }
 
@@ -168,7 +163,7 @@ struct ModernQuickActionButton: View {
         Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.title2)
+                    .font(FieldPayFont.title2)
                     .foregroundColor(.white)
                     .frame(width: 44, height: 44)
                     .background(gradient)
@@ -176,25 +171,21 @@ struct ModernQuickActionButton: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(FieldPayTheme.ink)
                     
                     Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.callout)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                 }
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.callout)
+                    .foregroundColor(FieldPayTheme.inkMuted)
             }
-            .padding(20)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+            .fieldPayCard(padding: 18, cornerRadius: 18)
         }
         .buttonStyle(PlainButtonStyle())
     }

@@ -21,30 +21,38 @@ struct DashboardView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Header
-                    DashboardHeader()
-                    
-                    // Quick Actions Grid
-                    QuickActionsGrid(
-                        selectedTab: $selectedTab,
-                        showingPaymentSheet: $showingPaymentSheet,
-                        showingTapToPaySheet: $showingTapToPaySheet,
-                        showingInvoiceSheet: $showingInvoiceSheet,
-                        showingCustomerSheet: $showingCustomerSheet,
-                        showingReportsSheet: $showingReportsSheet
-                    )
-                    
-                    // Recent Activity Section
-                    RecentActivitySection(
-                        customerViewModel: customerViewModel,
-                        invoiceViewModel: invoiceViewModel
-                    )
+            ZStack {
+                FieldPayBackground()
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        DashboardHeader()
+                        
+                        DashboardHeroCard(
+                            customerCount: customerViewModel.customers.count,
+                            invoiceCount: invoiceViewModel.invoices.count,
+                            paymentCount: paymentViewModel.payments.count,
+                            orderCount: salesOrderViewModel.salesOrders.count
+                        )
+                        
+                        QuickActionsGrid(
+                            selectedTab: $selectedTab,
+                            showingPaymentSheet: $showingPaymentSheet,
+                            showingTapToPaySheet: $showingTapToPaySheet,
+                            showingInvoiceSheet: $showingInvoiceSheet,
+                            showingCustomerSheet: $showingCustomerSheet,
+                            showingReportsSheet: $showingReportsSheet
+                        )
+                        
+                        RecentActivitySection(
+                            customerViewModel: customerViewModel,
+                            invoiceViewModel: invoiceViewModel
+                        )
+                    }
+                    .padding(.vertical, 24)
                 }
-                .padding(.vertical)
+                .navigationBarHidden(true)
             }
-            .navigationBarHidden(true)
         }
     }
 }
@@ -53,16 +61,79 @@ struct DashboardView: View {
 struct DashboardHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("FieldPay Dashboard")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+            Text("FieldPay")
+                .font(FieldPayFont.display)
+                .foregroundColor(FieldPayTheme.ink)
             
-            Text("Manage your business operations")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            Text("Operations, payments, and customer activity at a glance.")
+                .font(FieldPayFont.callout)
+                .foregroundColor(FieldPayTheme.inkMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
+    }
+}
+
+struct DashboardHeroCard: View {
+    let customerCount: Int
+    let invoiceCount: Int
+    let paymentCount: Int
+    let orderCount: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Today")
+                        .font(FieldPayFont.callout)
+                        .foregroundColor(FieldPayTheme.inkMuted)
+                    
+                    Text("Business Pulse")
+                        .font(FieldPayFont.title)
+                        .foregroundColor(FieldPayTheme.ink)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .background(FieldPayTheme.accentGradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                DashboardMetricTile(title: "Customers", value: "\(customerCount)", tint: FieldPayTheme.accent)
+                DashboardMetricTile(title: "Invoices", value: "\(invoiceCount)", tint: FieldPayTheme.highlight)
+                DashboardMetricTile(title: "Payments", value: "\(paymentCount)", tint: FieldPayTheme.success)
+                DashboardMetricTile(title: "Orders", value: "\(orderCount)", tint: FieldPayTheme.ink)
+            }
+        }
+        .fieldPayCard(padding: 22, cornerRadius: 22)
+        .padding(.horizontal, 20)
+    }
+}
+
+struct DashboardMetricTile: View {
+    let title: String
+    let value: String
+    let tint: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(FieldPayFont.caption)
+                .foregroundColor(FieldPayTheme.inkMuted)
+            
+            Text(value)
+                .font(FieldPayFont.metric)
+                .foregroundColor(FieldPayTheme.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(tint.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 
@@ -76,15 +147,21 @@ struct QuickActionsGrid: View {
     @Binding var showingReportsSheet: Bool
     
     var body: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible())
-        ], spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Quick Actions")
+                .font(FieldPayFont.title2)
+                .foregroundColor(FieldPayTheme.ink)
+                .padding(.horizontal, 20)
+            
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 16) {
             QuickActionCard(
                 title: "New Payment",
                 subtitle: "Process payment",
                 icon: "creditcard.fill",
-                color: .blue
+                color: FieldPayTheme.accent
             ) {
                 showingPaymentSheet = true
             }
@@ -93,7 +170,7 @@ struct QuickActionsGrid: View {
                 title: "Tap to Pay",
                 subtitle: "Contactless payment",
                 icon: "wave.3.right",
-                color: .green
+                color: FieldPayTheme.success
             ) {
                 showingTapToPaySheet = true
             }
@@ -102,7 +179,7 @@ struct QuickActionsGrid: View {
                 title: "Customers",
                 subtitle: "Manage customers",
                 icon: "person.2.fill",
-                color: .purple
+                color: FieldPayTheme.ink
             ) {
                 selectedTab = 1
             }
@@ -111,7 +188,7 @@ struct QuickActionsGrid: View {
                 title: "Sales Orders",
                 subtitle: "View orders",
                 icon: "cart.fill",
-                color: .red
+                color: FieldPayTheme.highlight
             ) {
                 selectedTab = 2
             }
@@ -120,12 +197,13 @@ struct QuickActionsGrid: View {
                 title: "Reports",
                 subtitle: "Analytics & insights",
                 icon: "chart.bar.fill",
-                color: .indigo
+                color: FieldPayTheme.accentDeep
             ) {
                 showingReportsSheet = true
             }
+            }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
     }
 }
 
@@ -137,13 +215,15 @@ struct RecentActivitySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recent Activity")
-                .font(.headline)
-                .padding(.horizontal)
+                .font(FieldPayFont.title2)
+                .foregroundColor(FieldPayTheme.ink)
+                .padding(.horizontal, 20)
             
-            VStack(spacing: 8) {
+            VStack(spacing: 12) {
                 if customerViewModel.customers.isEmpty && invoiceViewModel.invoices.isEmpty {
                     Text("No recent activity")
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.callout)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                         .padding()
                 } else {
                     // Show recent customers
@@ -153,7 +233,7 @@ struct RecentActivitySection: View {
                                 title: customer.name,
                                 subtitle: "Customer",
                                 icon: "person.fill",
-                                color: .blue
+                                color: FieldPayTheme.accent
                             )
                         }
                     }
@@ -165,13 +245,13 @@ struct RecentActivitySection: View {
                                 title: "Invoice #\(invoice.invoiceNumber)",
                                 subtitle: "$\(String(format: "%.2f", (invoice.amount as NSDecimalNumber).doubleValue))",
                                 icon: "doc.text.fill",
-                                color: .orange
+                                color: FieldPayTheme.highlight
                             )
                         }
                     }
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
         }
     }
 }
@@ -185,25 +265,40 @@ struct QuickActionCard: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundColor(.white)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            LinearGradient(
+                                colors: [color.opacity(0.9), color],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    
+                    Spacer()
+                    
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
+                }
                 
-                VStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(FieldPayTheme.ink)
                     
                     Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fieldPaySoftCard(padding: 16, cornerRadius: 18)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -218,25 +313,23 @@ struct RecentActivityRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.title3)
+                .font(FieldPayFont.headline)
                 .foregroundColor(color)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.callout)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
             }
             
             Spacer()
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
+        .fieldPaySoftCard(padding: 14, cornerRadius: 14)
     }
 }
 

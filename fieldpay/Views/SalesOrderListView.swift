@@ -11,145 +11,145 @@ struct SalesOrderListView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Customer Selection Header
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Sales Orders")
-                            .font(.title)
-                            .fontWeight(.bold)
-                        
-                        if selectedCustomer == nil {
-                            Text("Select a customer to view their sales orders")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    // Customer Selection Button
-                    Button(action: { showingCustomerPicker = true }) {
-                        HStack {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(selectedCustomer != nil ? .blue : .gray)
+            ZStack {
+                FieldPayBackground()
+                
+                VStack(spacing: 0) {
+                    // Customer Selection Header
+                    VStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Sales Orders")
+                                .font(FieldPayFont.display)
+                                .foregroundColor(FieldPayTheme.ink)
                             
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(selectedCustomer?.name ?? "Select Customer")
-                                    .font(.headline)
-                                    .foregroundColor(selectedCustomer != nil ? .primary : .secondary)
-                                
-                                if let customer = selectedCustomer {
-                                    Text("ID: \(customer.id)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+                            if selectedCustomer == nil {
+                                Text("Select a customer to view their sales orders")
+                                    .font(FieldPayFont.callout)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                             }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
                         }
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // Status Filter (only show when customer is selected)
-                    if selectedCustomer != nil {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                StatusFilterChip(
-                                    title: "All Orders",
-                                    count: viewModel.salesOrders.count,
-                                    isSelected: selectedStatus == nil
-                                ) {
-                                    selectedStatus = nil
-                                }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        // Customer Selection Button
+                        Button(action: { showingCustomerPicker = true }) {
+                            HStack {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .font(FieldPayFont.title2)
+                                    .foregroundColor(selectedCustomer != nil ? FieldPayTheme.accent : FieldPayTheme.inkMuted)
                                 
-                                ForEach(SalesOrder.SalesOrderStatus.allCases, id: \.self) { status in
-                                    let count = viewModel.salesOrders.filter { $0.status == status }.count
-                                    StatusFilterChip(
-                                        title: status.displayName,
-                                        count: count,
-                                        isSelected: selectedStatus == status
-                                    ) {
-                                        selectedStatus = status
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(selectedCustomer?.name ?? "Select Customer")
+                                        .font(FieldPayFont.headline)
+                                        .foregroundColor(selectedCustomer != nil ? FieldPayTheme.ink : FieldPayTheme.inkMuted)
+                                    
+                                    if let customer = selectedCustomer {
+                                        Text("ID: \(customer.id)")
+                                            .font(FieldPayFont.caption)
+                                            .foregroundColor(FieldPayTheme.inkMuted)
                                     }
                                 }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                             }
-                            .padding(.horizontal)
+                            .fieldPaySoftCard(padding: 16, cornerRadius: 16)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Status Filter (only show when customer is selected)
+                        if selectedCustomer != nil {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    StatusFilterChip(
+                                        title: "All Orders",
+                                        count: viewModel.salesOrders.count,
+                                        isSelected: selectedStatus == nil
+                                    ) {
+                                        selectedStatus = nil
+                                    }
+                                    
+                                    ForEach(SalesOrder.SalesOrderStatus.allCases, id: \.self) { status in
+                                        let count = viewModel.salesOrders.filter { $0.status == status }.count
+                                        StatusFilterChip(
+                                            title: status.displayName,
+                                            count: count,
+                                            isSelected: selectedStatus == status
+                                        ) {
+                                            selectedStatus = status
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
                         }
                     }
-                }
-                .padding()
-                .background(Color(.systemBackground))
-                
-                // Content Area
-                if selectedCustomer == nil {
-                    // Empty state - no customer selected
-                    VStack(spacing: 16) {
-                        Image(systemName: "person.crop.circle.badge.questionmark")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        
-                        Text("Select a Customer")
-                            .font(.headline)
-                        
-                        Text("Choose a customer from the list to view their sales orders, order status, line items, and related payments.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        
-                        Button("Select Customer") {
-                            showingCustomerPicker = true
+                    .padding()
+                    .background(FieldPayTheme.surface)
+                    
+                    // Content Area
+                    if selectedCustomer == nil {
+                        // Empty state - no customer selected
+                        VStack(spacing: 16) {
+                            Image(systemName: "person.crop.circle.badge.questionmark")
+                                .font(.system(size: 60))
+                                .foregroundColor(FieldPayTheme.inkMuted)
+                            
+                            Text("Select a Customer")
+                                .font(FieldPayFont.headline)
+                            
+                            Text("Choose a customer from the list to view their sales orders, order status, line items, and related payments.")
+                                .font(FieldPayFont.callout)
+                                .foregroundColor(FieldPayTheme.inkMuted)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            
+                            Button("Select Customer") {
+                                showingCustomerPicker = true
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemGroupedBackground))
-                } else if viewModel.isLoading {
-                    ProgressView("Loading sales orders...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(.systemGroupedBackground))
-                } else if let errorMessage = viewModel.errorMessage {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.largeTitle)
-                            .foregroundColor(.orange)
-                        Text("Error")
-                            .font(.headline)
-                        Text(errorMessage)
-                            .font(.caption)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        Button("Retry") {
-                            loadSalesOrdersForSelectedCustomer()
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemGroupedBackground))
-                } else {
-                    // Sales Orders List
-                    List {
-                        ForEach(filteredSalesOrders) { salesOrder in
-                            Button(action: {
-                                selectedSalesOrder = salesOrder
-                            }) {
-                                EnhancedSalesOrderRowView(salesOrder: salesOrder)
+                    } else if viewModel.isLoading {
+                        ProgressView("Loading sales orders...")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let errorMessage = viewModel.errorMessage {
+                        VStack(spacing: 16) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.largeTitle)
+                                .foregroundColor(FieldPayTheme.highlight)
+                            Text("Error")
+                                .font(FieldPayFont.headline)
+                            Text(errorMessage)
+                                .font(FieldPayFont.caption)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            Button("Retry") {
+                                loadSalesOrdersForSelectedCustomer()
                             }
-                            .buttonStyle(PlainButtonStyle())
+                            .buttonStyle(.borderedProminent)
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        // Sales Orders List
+                        List {
+                            ForEach(filteredSalesOrders) { salesOrder in
+                                Button(action: {
+                                    selectedSalesOrder = salesOrder
+                                }) {
+                                    EnhancedSalesOrderRowView(salesOrder: salesOrder)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .listRowBackground(Color.clear)
+                            }
+                        }
+                        .listStyle(PlainListStyle())
+                        .scrollContentBackground(.hidden)
                     }
-                    .listStyle(PlainListStyle())
-                    .background(Color(.systemGroupedBackground))
                 }
+                .navigationBarHidden(true)
             }
-            .navigationBarHidden(true)
             .sheet(isPresented: $showingCustomerPicker) {
                 CustomerPickerForSalesOrdersView(selectedCustomer: $selectedCustomer)
             }
@@ -190,21 +190,25 @@ struct StatusFilterChip: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Text(title)
-                    .font(.caption)
-                    .fontWeight(.medium)
+                    .font(FieldPayFont.caption)
+                    .fontWeight(.semibold)
                 
                 Text("\(count)")
-                    .font(.caption2)
+                    .font(FieldPayFont.caption)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(isSelected ? Color.white.opacity(0.3) : Color.gray.opacity(0.3))
-                    .cornerRadius(8)
+                    .background(isSelected ? Color.white.opacity(0.3) : FieldPayTheme.inkMuted.opacity(0.2))
+                    .clipShape(Capsule())
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.blue : Color(.systemGray5))
-            .foregroundColor(isSelected ? .white : .primary)
-            .cornerRadius(20)
+            .background(isSelected ? FieldPayTheme.accentGradient : LinearGradient(colors: [FieldPayTheme.surfaceSoft, FieldPayTheme.surfaceSoft], startPoint: .leading, endPoint: .trailing))
+            .foregroundColor(isSelected ? .white : FieldPayTheme.ink)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(FieldPayTheme.stroke, lineWidth: isSelected ? 0 : 1)
+            )
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -222,14 +226,12 @@ struct CustomerPickerForSalesOrdersView: View {
                 // Search Bar
                 HStack {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                     
                     TextField("Search customers...", text: $searchText)
                         .textFieldStyle(PlainTextFieldStyle())
                 }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .fieldPaySoftCard(padding: 14, cornerRadius: 14)
                 .padding()
                 
                 // Customer List
@@ -246,24 +248,24 @@ struct CustomerPickerForSalesOrdersView: View {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(customer.name)
-                                            .font(.headline)
-                                            .foregroundColor(.primary)
+                                            .font(FieldPayFont.headline)
+                                            .foregroundColor(FieldPayTheme.ink)
                                         
                                         Text("ID: \(customer.id)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
+                                            .font(FieldPayFont.caption)
+                                            .foregroundColor(FieldPayTheme.inkMuted)
                                         
                                         if let email = customer.email {
                                             Text(email)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
+                                                .font(FieldPayFont.caption)
+                                                .foregroundColor(FieldPayTheme.inkMuted)
                                         }
                                     }
                                     
                                     Spacer()
                                     
                                     Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(FieldPayTheme.inkMuted)
                                 }
                                 .padding(.vertical, 4)
                             }
@@ -322,22 +324,20 @@ struct EnhancedSalesOrderRowView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(salesOrder.orderNumber)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(FieldPayTheme.ink)
                     
                     Text(salesOrder.orderDate, style: .date)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                 }
                 
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(String(format: "$%.2f", (salesOrder.amount as NSDecimalNumber).doubleValue))
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(FieldPayTheme.ink)
                     
                     SalesOrderStatusBadge(status: salesOrder.status)
                 }
@@ -349,24 +349,24 @@ struct EnhancedSalesOrderRowView: View {
                 if !salesOrder.items.isEmpty {
                     HStack {
                         Image(systemName: "list.bullet")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
+                            .foregroundColor(FieldPayTheme.inkMuted)
+                            .font(FieldPayFont.caption)
                         
                         Text("\(salesOrder.items.count) item\(salesOrder.items.count == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.caption)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                         
                         Spacer()
                         
                         if let expectedShipDate = salesOrder.expectedShipDate {
                             HStack(spacing: 4) {
                                 Image(systemName: "shippingbox")
-                                    .foregroundColor(.secondary)
-                                    .font(.caption)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
+                                    .font(FieldPayFont.caption)
                                 
                                 Text("Ship: \(expectedShipDate, style: .date)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .font(FieldPayFont.caption)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                             }
                         }
                     }
@@ -376,10 +376,7 @@ struct EnhancedSalesOrderRowView: View {
                 OrderProgressView(status: salesOrder.status)
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .fieldPayCard(padding: 18, cornerRadius: 18)
     }
 }
 
@@ -399,9 +396,9 @@ struct OrderProgressView: View {
     
     private var progressColor: Color {
         switch status {
-        case .cancelled: return .red
-        case .delivered: return .green
-        default: return .blue
+        case .cancelled: return FieldPayTheme.danger
+        case .delivered: return FieldPayTheme.success
+        default: return FieldPayTheme.accent
         }
     }
     
@@ -409,21 +406,21 @@ struct OrderProgressView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Order Progress")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
                 
                 Spacer()
                 
                 Text(status.displayName)
-                    .font(.caption2)
-                    .fontWeight(.medium)
+                    .font(FieldPayFont.caption)
+                    .fontWeight(.semibold)
                     .foregroundColor(progressColor)
             }
             
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
-                        .fill(Color(.systemGray5))
+                        .fill(FieldPayTheme.surfaceSoft)
                         .frame(height: 4)
                         .cornerRadius(2)
                     
@@ -489,22 +486,22 @@ struct SalesOrderStatusBadge: View {
     
     var body: some View {
         Text(status.displayName)
-            .font(.caption)
+            .font(FieldPayFont.caption)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(statusColor.opacity(0.2))
             .foregroundColor(statusColor)
-            .cornerRadius(8)
+            .clipShape(Capsule())
     }
     
     private var statusColor: Color {
         switch status {
-        case .pendingApproval: return .orange
-        case .approved: return .blue
-        case .inProgress: return .purple
-        case .shipped: return .green
-        case .delivered: return .green
-        case .cancelled: return .red
+        case .pendingApproval: return FieldPayTheme.highlight
+        case .approved: return FieldPayTheme.accent
+        case .inProgress: return FieldPayTheme.ink
+        case .shipped: return FieldPayTheme.success
+        case .delivered: return FieldPayTheme.success
+        case .cancelled: return FieldPayTheme.danger
         }
     }
 }
@@ -523,20 +520,23 @@ struct EnhancedSalesOrderDetailView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+            ZStack {
+                FieldPayBackground()
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
                     // Order Summary Card
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(salesOrder.orderNumber)
-                                    .font(.title)
-                                    .fontWeight(.bold)
+                                    .font(FieldPayFont.title)
+                                    .foregroundColor(FieldPayTheme.ink)
                                 
                                 if let customer = customer {
                                     Text(customer.name)
-                                        .font(.headline)
-                                        .foregroundColor(.secondary)
+                                        .font(FieldPayFont.callout)
+                                        .foregroundColor(FieldPayTheme.inkMuted)
                                 }
                             }
                             
@@ -552,16 +552,15 @@ struct EnhancedSalesOrderDetailView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Text("Total Amount:")
-                                    .fontWeight(.medium)
+                                    .font(FieldPayFont.callout)
                                 Spacer()
                                 Text(String(format: "$%.2f", (salesOrder.amount as NSDecimalNumber).doubleValue))
-                                    .font(.title2)
-                                    .fontWeight(.bold)
+                                    .font(FieldPayFont.title2)
                             }
                             
                             HStack {
                                 Text("Order Date:")
-                                    .fontWeight(.medium)
+                                    .font(FieldPayFont.callout)
                                 Spacer()
                                 Text(salesOrder.orderDate, style: .date)
                             }
@@ -569,34 +568,31 @@ struct EnhancedSalesOrderDetailView: View {
                             if let expectedShipDate = salesOrder.expectedShipDate {
                                 HStack {
                                     Text("Expected Ship Date:")
-                                        .fontWeight(.medium)
+                                        .font(FieldPayFont.callout)
                                     Spacer()
                                     Text(expectedShipDate, style: .date)
-                                        .foregroundColor(expectedShipDate < Date() ? .orange : .primary)
+                                        .foregroundColor(expectedShipDate < Date() ? FieldPayTheme.highlight : FieldPayTheme.ink)
                                 }
                             }
                         }
                     }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .fieldPayCard(padding: 20, cornerRadius: 20)
                     
                     // Line Items Section
                     if !salesOrder.items.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Text("Line Items")
-                                    .font(.headline)
+                                    .font(FieldPayFont.headline)
                                 
                                 Spacer()
                                 
                                 Text("\(salesOrder.items.count) items")
-                                    .font(.caption)
+                                    .font(FieldPayFont.caption)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(Color(.systemGray5))
-                                    .cornerRadius(8)
+                                    .background(FieldPayTheme.surfaceSoft)
+                                    .clipShape(Capsule())
                             }
                             
                             VStack(spacing: 1) {
@@ -604,20 +600,16 @@ struct EnhancedSalesOrderDetailView: View {
                                     EnhancedSalesOrderItemRow(item: item)
                                 }
                             }
-                            .background(Color(.systemBackground))
-                            .cornerRadius(8)
+                            .fieldPaySoftCard(padding: 0, cornerRadius: 12)
                         }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                        .fieldPayCard(padding: 20, cornerRadius: 20)
                     }
                     
                     // Related Payments Section
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Related Payments")
-                                .font(.headline)
+                                .font(FieldPayFont.headline)
                             
                             Spacer()
                             
@@ -630,40 +622,34 @@ struct EnhancedSalesOrderDetailView: View {
                         if relatedPayments.isEmpty && !isLoadingPayments {
                             VStack(spacing: 8) {
                                 Image(systemName: "creditcard")
-                                    .font(.title2)
-                                    .foregroundColor(.gray)
+                                    .font(FieldPayFont.title2)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                                 
                                 Text("No payments found")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                    .font(FieldPayFont.callout)
+                                    .foregroundColor(FieldPayTheme.ink)
                                 
                                 Text("Payments made against this order will appear here")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .font(FieldPayFont.caption)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                                     .multilineTextAlignment(.center)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
+                            .fieldPaySoftCard(padding: 16, cornerRadius: 16)
                         } else {
                             VStack(spacing: 1) {
                                 ForEach(relatedPayments, id: \.id) { payment in
                                     RelatedPaymentRow(payment: payment)
                                 }
                             }
-                            .background(Color(.systemBackground))
-                            .cornerRadius(8)
+                            .fieldPaySoftCard(padding: 0, cornerRadius: 12)
                         }
                     }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .fieldPayCard(padding: 20, cornerRadius: 20)
                 }
                 .padding()
             }
-            .background(Color(.systemGroupedBackground))
+            }
             .navigationTitle("Order Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -699,52 +685,52 @@ struct EnhancedSalesOrderItemRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Circle()
-                .fill(item.isShipped ? Color.green : Color.orange)
+                .fill(item.isShipped ? FieldPayTheme.success : FieldPayTheme.highlight)
                 .frame(width: 8, height: 8)
                 .padding(.top, 6)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.description)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(FieldPayFont.callout)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 HStack {
                     Text("Qty: \(String(format: "%.0f", item.quantity))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                     
                     Text("•")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                     
                     Text("Unit: \(String(format: "$%.2f", (item.unitPrice as NSDecimalNumber).doubleValue))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                     
                     Spacer()
                 }
                 
                 if item.isShipped {
                     Text("Shipped")
-                        .font(.caption2)
-                        .fontWeight(.medium)
+                        .font(FieldPayFont.caption)
+                        .fontWeight(.semibold)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.2))
-                        .foregroundColor(.green)
-                        .cornerRadius(4)
+                        .background(FieldPayTheme.success.opacity(0.2))
+                        .foregroundColor(FieldPayTheme.success)
+                        .clipShape(Capsule())
                 }
             }
             
             Spacer()
             
             Text(String(format: "$%.2f", (item.amount as NSDecimalNumber).doubleValue))
-                .font(.subheadline)
-                .fontWeight(.semibold)
+                .font(FieldPayFont.callout)
+                .foregroundColor(FieldPayTheme.ink)
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
-        .background(Color(.systemBackground))
+        .background(Color.clear)
     }
 }
 
@@ -754,23 +740,23 @@ struct RelatedPaymentRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: paymentMethodIcon)
-                .font(.title2)
-                .foregroundColor(.blue)
+                .font(FieldPayFont.title2)
+                .foregroundColor(FieldPayTheme.accent)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(payment.paymentNumber)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(FieldPayFont.callout)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(payment.date, style: .date)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
                 
                 if let paymentMethod = payment.paymentMethod {
                     Text(paymentMethod)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                 }
             }
             
@@ -778,16 +764,15 @@ struct RelatedPaymentRow: View {
             
             VStack(alignment: .trailing, spacing: 4) {
                 Text(String(format: "$%.2f", (payment.amount as NSDecimalNumber).doubleValue))
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.green)
+                    .font(FieldPayFont.callout)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 PaymentStatusBadge(status: payment.status)
             }
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
-        .background(Color(.systemBackground))
+        .background(Color.clear)
     }
     
     private var paymentMethodIcon: String {
@@ -814,27 +799,27 @@ struct PaymentStatusBadge: View {
     
     var body: some View {
         Text(status.capitalized)
-            .font(.caption2)
-            .fontWeight(.medium)
+            .font(FieldPayFont.caption)
+            .fontWeight(.semibold)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(statusColor.opacity(0.2))
             .foregroundColor(statusColor)
-            .cornerRadius(4)
+            .clipShape(Capsule())
     }
     
     private var statusColor: Color {
         switch status.lowercased() {
         case "pending", "draft":
-            return .orange
+            return FieldPayTheme.highlight
         case "completed", "paid", "approved":
-            return .green
+            return FieldPayTheme.success
         case "failed", "declined", "rejected":
-            return .red
+            return FieldPayTheme.danger
         case "cancelled", "canceled":
-            return .gray
+            return FieldPayTheme.inkMuted
         default:
-            return .blue
+            return FieldPayTheme.accent
         }
     }
 }

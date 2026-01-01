@@ -55,17 +55,20 @@ struct ReportsView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
+            ZStack {
+                FieldPayBackground()
+                
+                ScrollView {
+                    VStack(spacing: 24) {
                     // Header Section
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Reports & Analytics")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
+                            .font(FieldPayFont.display)
+                            .foregroundColor(FieldPayTheme.ink)
                         
                         Text("Business insights and performance metrics")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.callout)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
@@ -74,8 +77,8 @@ struct ReportsView: View {
                     VStack(spacing: 16) {
                         HStack {
                             Text("Filters")
-                                .font(.headline)
-                                .fontWeight(.semibold)
+                                .font(FieldPayFont.headline)
+                                .foregroundColor(FieldPayTheme.ink)
                             
                             Spacer()
                             
@@ -83,16 +86,15 @@ struct ReportsView: View {
                                 selectedTimeRange = .week
                                 selectedReportType = .payments
                             }
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
+                            .font(FieldPayFont.callout)
+                            .foregroundColor(FieldPayTheme.accent)
                         }
                         
                         // Time Range Filter
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Time Range")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.secondary)
+                                .font(FieldPayFont.caption)
+                                .foregroundColor(FieldPayTheme.inkMuted)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
@@ -112,9 +114,8 @@ struct ReportsView: View {
                         // Report Type Filter
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Report Type")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.secondary)
+                                .font(FieldPayFont.caption)
+                                .foregroundColor(FieldPayTheme.inkMuted)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
@@ -131,10 +132,7 @@ struct ReportsView: View {
                             }
                         }
                     }
-                    .padding(20)
-                    .background(Color(.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+                    .fieldPayCard(padding: 20, cornerRadius: 20)
                     .padding(.horizontal, 20)
                     
                     // Summary Cards
@@ -147,8 +145,8 @@ struct ReportsView: View {
                             value: String(format: "$%.0f", max(0, getTotalRevenue().isFinite ? getTotalRevenue() : 0)),
                             subtitle: "This period",
                             icon: "dollarsign.circle.fill",
-                            color: .green,
-                            gradient: LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            color: FieldPayTheme.success,
+                            gradient: FieldPayTheme.successGradient
                         )
                         
                         ModernSummaryCard(
@@ -156,8 +154,8 @@ struct ReportsView: View {
                             value: "\(getTotalPayments())",
                             subtitle: "Transactions",
                             icon: "creditcard.fill",
-                            color: .blue,
-                            gradient: LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            color: FieldPayTheme.accent,
+                            gradient: FieldPayTheme.accentGradient
                         )
                         
                         ModernSummaryCard(
@@ -165,8 +163,8 @@ struct ReportsView: View {
                             value: String(format: "$%.0f", max(0, getOutstandingAmount().isFinite ? getOutstandingAmount() : 0)),
                             subtitle: "Invoices",
                             icon: "exclamationmark.triangle.fill",
-                            color: .orange,
-                            gradient: LinearGradient(colors: [.orange, .red], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            color: FieldPayTheme.highlight,
+                            gradient: FieldPayTheme.highlightGradient
                         )
                         
                         ModernSummaryCard(
@@ -174,8 +172,8 @@ struct ReportsView: View {
                             value: "\(getActiveCustomers())",
                             subtitle: "Total",
                             icon: "person.2.fill",
-                            color: .purple,
-                            gradient: LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            color: FieldPayTheme.ink,
+                            gradient: LinearGradient(colors: [FieldPayTheme.ink.opacity(0.7), FieldPayTheme.ink], startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
                     }
                     .padding(.horizontal, 20)
@@ -184,16 +182,16 @@ struct ReportsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text("Payment Trends")
-                                .font(.title2)
-                                .fontWeight(.bold)
+                                .font(FieldPayFont.title2)
+                                .foregroundColor(FieldPayTheme.ink)
                             
                             Spacer()
                             
                             Button("Export") {
                                 // Export functionality
                             }
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
+                            .font(FieldPayFont.callout)
+                            .foregroundColor(FieldPayTheme.accent)
                         }
                         .padding(.horizontal, 20)
                         
@@ -206,16 +204,16 @@ struct ReportsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text("Recent Activity")
-                                .font(.title2)
-                                .fontWeight(.bold)
+                                .font(FieldPayFont.title2)
+                                .foregroundColor(FieldPayTheme.ink)
                             
                             Spacer()
                             
                             Button("View All") {
                                 // Navigate to full activity view
                             }
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
+                            .font(FieldPayFont.callout)
+                            .foregroundColor(FieldPayTheme.accent)
                         }
                         .padding(.horizontal, 20)
                         
@@ -241,9 +239,9 @@ struct ReportsView: View {
                         .padding(.horizontal, 20)
                     }
                 }
-                .padding(.vertical, 20)
+                    .padding(.vertical, 24)
+                }
             }
-            .background(Color(.systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -307,7 +305,7 @@ struct ReportsView: View {
                 subtitle: "\(String(format: "$%.2f", (payment.amount as NSDecimalNumber).doubleValue)) - \(payment.paymentMethod.displayName)",
                 time: payment.createdDate,
                 icon: "creditcard.fill",
-                color: .green
+                color: FieldPayTheme.success
             )
         }
     }
@@ -349,7 +347,7 @@ struct ModernSummaryCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: icon)
-                    .font(.title2)
+                    .font(FieldPayFont.title2)
                     .foregroundColor(.white)
                     .frame(width: 44, height: 44)
                     .background(gradient)
@@ -358,30 +356,25 @@ struct ModernSummaryCard: View {
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
             }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(value)
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.metric)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.headline)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
             }
         }
-        .padding(20)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+        .fieldPayCard(padding: 20, cornerRadius: 18)
     }
 }
 
@@ -394,12 +387,12 @@ struct ModernChartContainer: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Daily Revenue")
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(FieldPayTheme.ink)
                     
                     Text("Last 7 days")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                 }
                 
                 Spacer()
@@ -408,12 +401,12 @@ struct ModernChartContainer: View {
                 HStack(spacing: 12) {
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(Color.blue)
+                            .fill(FieldPayTheme.accent)
                             .frame(width: 8, height: 8)
                         
                         Text("Revenue")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.caption)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                     }
                 }
             }
@@ -425,24 +418,21 @@ struct ModernChartContainer: View {
                         // Bar
                         RoundedRectangle(cornerRadius: 4)
                             .fill(
-                                LinearGradient(colors: [.blue, .cyan], startPoint: .bottom, endPoint: .top)
+                                FieldPayTheme.accentGradient
                             )
                             .frame(width: 24, height: max(20, CGFloat((point.value.isFinite ? point.value : 0) / 25)))
-                            .shadow(color: .blue.opacity(0.3), radius: 2, x: 0, y: 1)
+                            .shadow(color: FieldPayTheme.accent.opacity(0.3), radius: 2, x: 0, y: 1)
                         
                         // Date Label
                         Text(formatDate(point.date))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.caption)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                     }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(20)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+        .fieldPayCard(padding: 20, cornerRadius: 18)
     }
     
     private func formatDate(_ date: Date) -> String {

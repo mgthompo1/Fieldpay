@@ -55,7 +55,10 @@ struct CustomerListView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            ZStack {
+                FieldPayBackground()
+                
+                VStack(spacing: 0) {
                 // Filter Pills Header
                 VStack(spacing: 16) {
                     // Filter Pills
@@ -76,7 +79,7 @@ struct CustomerListView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
-                .background(Color(.systemGroupedBackground))
+                .background(FieldPayTheme.surfaceSoft)
                 
                 // Customer List
                 if viewModel.isLoading {
@@ -128,6 +131,7 @@ struct CustomerListView: View {
                         await viewModel.loadNextPage()
                     }
                 }
+                }
             }
             .navigationTitle("Customers")
             .navigationBarTitleDisplayMode(.large)
@@ -175,14 +179,11 @@ struct ModernCustomerCard: View {
         HStack(spacing: 16) {
                 // Avatar
                 Circle()
-                    .fill(
-                        LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
+                    .fill(FieldPayTheme.accentGradient)
                     .frame(width: 60, height: 60)
                     .overlay(
                         Text(customer.name.prefix(1).uppercased())
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .font(FieldPayFont.title2)
                             .foregroundColor(.white)
                     )
                 
@@ -190,52 +191,51 @@ struct ModernCustomerCard: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(customer.name)
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
+                            .font(FieldPayFont.headline)
+                            .foregroundColor(FieldPayTheme.ink)
                         
                         Spacer()
                         
                         // Status Badge
                         Text(customer.isActive ? "Active" : "Inactive")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(customer.isActive ? .green : .red)
+                            .font(FieldPayFont.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(customer.isActive ? FieldPayTheme.success : FieldPayTheme.danger)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(
-                                (customer.isActive ? Color.green : Color.red).opacity(0.1)
+                                (customer.isActive ? FieldPayTheme.success : FieldPayTheme.danger).opacity(0.12)
                             )
                             .clipShape(Capsule())
                     }
                     
                     if let companyName = customer.companyName {
                         Text(companyName)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.callout)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                     }
                     
                     if let email = customer.email {
                         HStack(spacing: 4) {
                             Image(systemName: "envelope")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(FieldPayFont.caption)
+                                .foregroundColor(FieldPayTheme.inkMuted)
                             
                             Text(email)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(FieldPayFont.caption)
+                                .foregroundColor(FieldPayTheme.inkMuted)
                         }
                     }
                     
                     if let phone = customer.phone {
                         HStack(spacing: 4) {
                             Image(systemName: "phone")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(FieldPayFont.caption)
+                                .foregroundColor(FieldPayTheme.inkMuted)
                             
                             Text(phone)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(FieldPayFont.caption)
+                                .foregroundColor(FieldPayTheme.inkMuted)
                         }
                     }
                 }
@@ -244,13 +244,10 @@ struct ModernCustomerCard: View {
                 
                 // Chevron
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
             }
-            .padding(20)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+            .fieldPayCard(padding: 20, cornerRadius: 18)
     }
 }
 
@@ -345,13 +342,13 @@ struct CustomerDetailView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(customer.name)
-                                .font(.title)
-                                .fontWeight(.bold)
+                                .font(FieldPayFont.title)
+                                .foregroundColor(FieldPayTheme.ink)
                             
                             if let companyName = customer.companyName {
                                 Text(companyName)
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
+                                    .font(FieldPayFont.callout)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                             }
                         }
                         
@@ -368,12 +365,12 @@ struct CustomerDetailView: View {
                     // Contact Information
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Contact Information")
-                            .font(.headline)
+                            .font(FieldPayFont.headline)
                         
                         if let email = customer.email {
                             HStack {
                                 Image(systemName: "envelope")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(FieldPayTheme.accent)
                                 Text(email)
                             }
                         }
@@ -381,7 +378,7 @@ struct CustomerDetailView: View {
                         if let phone = customer.phone {
                             HStack {
                                 Image(systemName: "phone")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(FieldPayTheme.accent)
                                 Text(phone)
                             }
                         }
@@ -391,7 +388,7 @@ struct CustomerDetailView: View {
                     if let address = customer.address {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Address")
-                                .font(.headline)
+                                .font(FieldPayFont.headline)
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 if let street = address.street {
@@ -420,26 +417,23 @@ struct CustomerDetailView: View {
                     // Status
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Status")
-                            .font(.headline)
+                            .font(FieldPayFont.headline)
                         
                         HStack {
                             Circle()
-                                .fill(customer.isActive ? Color.green : Color.gray)
+                                .fill(customer.isActive ? FieldPayTheme.success : FieldPayTheme.inkMuted)
                                 .frame(width: 8, height: 8)
                             Text(customer.isActive ? "Active" : "Inactive")
-                                .font(.subheadline)
+                                .font(FieldPayFont.callout)
                         }
                     }
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                .fieldPayCard(padding: 20, cornerRadius: 20)
                 
                 // Quick Actions
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Quick Actions")
-                        .font(.headline)
+                        .font(FieldPayFont.title2)
                     
                     VStack(spacing: 8) {
                         ModernQuickActionButton(
@@ -481,7 +475,7 @@ struct CustomerDetailView: View {
                 // Recent Activity Tabs
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Recent Activity")
-                        .font(.headline)
+                        .font(FieldPayFont.title2)
                         .padding(.horizontal)
                     
                     // Tab Picker
@@ -814,38 +808,36 @@ struct TransactionRowView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(transaction.transactionNumber)
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                        .font(FieldPayFont.headline)
                     
                     Text(transaction.type)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                 }
                 
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(transaction.formattedAmount)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(transaction.amount >= 0 ? .green : .red)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(transaction.amount >= 0 ? FieldPayTheme.success : FieldPayTheme.danger)
                     
                     Text(transaction.formattedDate)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                 }
             }
             
             if let memo = transaction.memo, !memo.isEmpty {
                 Text(memo)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
                     .lineLimit(2)
             }
             
             HStack {
                 Text(transaction.status)
-                    .font(.caption)
+                    .font(FieldPayFont.caption)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(statusColor.opacity(0.2))
@@ -855,10 +847,7 @@ struct TransactionRowView: View {
                 Spacer()
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(8)
-        .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
+        .fieldPaySoftCard(padding: 16, cornerRadius: 14)
     }
     
     private var statusColor: Color {
@@ -879,13 +868,12 @@ struct PaymentRowView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(payment.paymentNumber)
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                        .font(FieldPayFont.headline)
                     
                     if let paymentMethod = payment.paymentMethod {
                         Text(paymentMethod)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.caption)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                     }
                 }
                 
@@ -893,26 +881,25 @@ struct PaymentRowView: View {
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(payment.formattedAmount)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(FieldPayTheme.success)
                     
                     Text(payment.formattedDate)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                 }
             }
             
             if let memo = payment.memo, !memo.isEmpty {
                 Text(memo)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
                     .lineLimit(2)
             }
             
             HStack {
                 Text(payment.status)
-                    .font(.caption)
+                    .font(FieldPayFont.caption)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(statusColor.opacity(0.2))
@@ -922,10 +909,7 @@ struct PaymentRowView: View {
                 Spacer()
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(8)
-        .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
+        .fieldPaySoftCard(padding: 16, cornerRadius: 14)
     }
     
     private var statusColor: Color {
@@ -951,19 +935,19 @@ struct PaymentDetailView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(payment.paymentNumber)
-                                .font(.title)
-                                .fontWeight(.bold)
+                                .font(FieldPayFont.title)
+                                .foregroundColor(FieldPayTheme.ink)
                             
                             Text("Payment")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
+                                .font(FieldPayFont.callout)
+                                .foregroundColor(FieldPayTheme.inkMuted)
                         }
                         
                         Spacer()
                         
                         Text(payment.status)
-                            .font(.caption)
-                            .fontWeight(.medium)
+                            .font(FieldPayFont.caption)
+                            .fontWeight(.semibold)
                             .foregroundColor(statusColor)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -977,15 +961,15 @@ struct PaymentDetailView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Amount:")
-                                .fontWeight(.medium)
+                                .font(FieldPayFont.callout)
                             Spacer()
                             Text(formatCurrency(payment.amount))
-                                .fontWeight(.bold)
+                                .font(FieldPayFont.headline)
                         }
                         
                         HStack {
                             Text("Date:")
-                                .fontWeight(.medium)
+                                .font(FieldPayFont.callout)
                             Spacer()
                             Text(payment.date, style: .date)
                         }
@@ -993,7 +977,7 @@ struct PaymentDetailView: View {
                         if let paymentMethod = payment.paymentMethod {
                             HStack {
                                 Text("Payment Method:")
-                                    .fontWeight(.medium)
+                                    .font(FieldPayFont.callout)
                                 Spacer()
                                 Text(paymentMethod)
                             }
@@ -1001,32 +985,26 @@ struct PaymentDetailView: View {
                         
                         HStack {
                             Text("Status:")
-                                .fontWeight(.medium)
+                                .font(FieldPayFont.callout)
                             Spacer()
                             Text(payment.status)
                                 .foregroundColor(statusColor)
                         }
                     }
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                .fieldPayCard(padding: 20, cornerRadius: 18)
                 
                 // Notes
                 if let memo = payment.memo, !memo.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Notes")
-                            .font(.headline)
+                            .font(FieldPayFont.headline)
                         
                         Text(memo)
-                            .font(.body)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.body)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                     }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .fieldPayCard(padding: 18, cornerRadius: 18)
                 }
             }
             .padding()

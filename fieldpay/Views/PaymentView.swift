@@ -17,22 +17,25 @@ struct PaymentView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(spacing: 24) {
-                    PaymentHeaderView()
-                    QuickPaymentCardView(
-                        amount: $amount,
-                        selectedCustomer: $selectedCustomer,
-                        selectedPaymentMethod: $selectedPaymentMethod,
-                        showingCustomerPicker: $showingCustomerPicker,
-                        onProcessPayment: processPayment
-                    )
-                    RecentPaymentsSectionView(viewModel: viewModel, customerViewModel: customerViewModel, selectedCustomer: $selectedCustomer)
+            ZStack {
+                FieldPayBackground()
+                
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(spacing: 24) {
+                        PaymentHeaderView()
+                        QuickPaymentCardView(
+                            amount: $amount,
+                            selectedCustomer: $selectedCustomer,
+                            selectedPaymentMethod: $selectedPaymentMethod,
+                            showingCustomerPicker: $showingCustomerPicker,
+                            onProcessPayment: processPayment
+                        )
+                        RecentPaymentsSectionView(viewModel: viewModel, customerViewModel: customerViewModel, selectedCustomer: $selectedCustomer)
+                    }
+                    .padding(.vertical, 24)
                 }
-                .padding(.vertical, 20)
+                .navigationBarTitleDisplayMode(.inline)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingPaymentSheet) {
                 if let amountValue = Decimal(string: amount) {
                     PaymentTapToPayView(viewModel: viewModel, amount: amountValue)
@@ -156,12 +159,12 @@ struct PaymentHeaderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Payments")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(FieldPayFont.display)
+                .foregroundColor(FieldPayTheme.ink)
             
             Text("Process payments and view transaction history")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(FieldPayFont.callout)
+                .foregroundColor(FieldPayTheme.inkMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
@@ -191,10 +194,7 @@ struct QuickPaymentCardView: View {
                 onProcessPayment: onProcessPayment
             )
         }
-        .padding(24)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .fieldPayCard(padding: 22, cornerRadius: 22)
         .padding(.horizontal, 20)
     }
 }
@@ -204,20 +204,20 @@ struct QuickPaymentHeaderView: View {
     var body: some View {
         HStack {
             Image(systemName: "creditcard.fill")
-                .font(.title2)
+                .font(FieldPayFont.title2)
                 .foregroundColor(.white)
                 .frame(width: 44, height: 44)
-                .background(LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .background(FieldPayTheme.successGradient)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("Quick Payment")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(FieldPayFont.title)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text("Process a new payment")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.callout)
+                    .foregroundColor(FieldPayTheme.inkMuted)
             }
             
             Spacer()
@@ -233,8 +233,7 @@ struct CustomerSelectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Customer")
-                .font(.headline)
-                .fontWeight(.semibold)
+                .font(FieldPayFont.headline)
             
             Button(action: {
                 showingCustomerPicker = true
@@ -243,31 +242,28 @@ struct CustomerSelectionView: View {
                     if let customer = selectedCustomer {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(customer.name)
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
+                                .font(FieldPayFont.headline)
+                                .foregroundColor(FieldPayTheme.ink)
                             
                             if let companyName = customer.companyName {
                                 Text(companyName)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                    .font(FieldPayFont.callout)
+                                    .foregroundColor(FieldPayTheme.inkMuted)
                             }
                         }
                     } else {
                         Text("Select Customer")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.headline)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                     }
                     
                     Spacer()
                     
                     Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                 }
-                .padding(20)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .fieldPaySoftCard(padding: 16, cornerRadius: 16)
             }
             .buttonStyle(PlainButtonStyle())
         }
@@ -281,27 +277,22 @@ struct AmountInputView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Amount")
-                .font(.headline)
-                .fontWeight(.semibold)
+                .font(FieldPayFont.headline)
             
             HStack(spacing: 16) {
                 Text("$")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.title)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 TextField("0.00", text: $amount)
-                    .font(.title)
-                    .fontWeight(.bold)
+                    .font(FieldPayFont.title)
                     .keyboardType(.decimalPad)
                     .textFieldStyle(PlainTextFieldStyle())
                     .multilineTextAlignment(.leading)
                 
                 Spacer()
             }
-            .padding(20)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .fieldPaySoftCard(padding: 16, cornerRadius: 16)
         }
     }
 }
@@ -313,8 +304,7 @@ struct PaymentMethodSelectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Payment Method")
-                .font(.headline)
-                .fontWeight(.semibold)
+                .font(FieldPayFont.headline)
             
             LazyVGrid(columns: [
                 GridItem(.flexible()),
@@ -343,20 +333,19 @@ struct ProcessPaymentButtonView: View {
         Button(action: onProcessPayment) {
             HStack {
                 Image(systemName: "creditcard.fill")
-                    .font(.title3)
+                    .font(FieldPayFont.headline)
                 
                 Text("Process Payment")
-                    .font(.headline)
-                    .fontWeight(.semibold)
+                    .font(FieldPayFont.headline)
             }
             .frame(maxWidth: .infinity)
             .padding()
             .background(
-                LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing)
+                FieldPayTheme.accentGradient
             )
             .foregroundColor(.white)
             .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+            .shadow(color: FieldPayTheme.accent.opacity(0.3), radius: 8, x: 0, y: 4)
         }
         .disabled(amount.isEmpty || selectedCustomer == nil)
         .opacity((amount.isEmpty || selectedCustomer == nil) ? 0.6 : 1.0)
@@ -373,16 +362,16 @@ struct RecentPaymentsSectionView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Recent Payments")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(FieldPayFont.title2)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Spacer()
                 
                 Button("View All") {
                     // Navigate to full payments list
                 }
-                .font(.subheadline)
-                .foregroundColor(.blue)
+                .font(FieldPayFont.callout)
+                .foregroundColor(FieldPayTheme.accent)
             }
             .padding(.horizontal, 20)
             
@@ -391,16 +380,15 @@ struct RecentPaymentsSectionView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .font(.system(size: 48))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                     
                     Text("Select a Customer")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .font(FieldPayFont.headline)
+                        .foregroundColor(FieldPayTheme.ink)
                     
                     Text("Choose a customer to view their recent payments")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.callout)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
@@ -446,26 +434,23 @@ struct ModernPaymentRow: View {
         HStack(spacing: 16) {
             // Payment Icon
             Circle()
-                .fill(
-                    LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
+                .fill(FieldPayTheme.successGradient)
                 .frame(width: 50, height: 50)
                 .overlay(
                     Image(systemName: payment.paymentMethod.icon)
-                        .font(.title3)
+                        .font(FieldPayFont.headline)
                         .foregroundColor(.white)
                 )
             
             // Payment Details
             VStack(alignment: .leading, spacing: 4) {
                 Text(payment.paymentMethod.displayName)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.headline)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(payment.createdDate, style: .date)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
             }
             
             Spacer()
@@ -473,13 +458,12 @@ struct ModernPaymentRow: View {
             // Amount and Status
             VStack(alignment: .trailing, spacing: 4) {
                 Text(String(format: "$%.2f", (payment.amount as NSDecimalNumber).doubleValue))
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.headline)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(payment.status.displayName)
-                    .font(.caption)
-                    .fontWeight(.medium)
+                    .font(FieldPayFont.caption)
+                    .fontWeight(.semibold)
                     .foregroundColor(statusColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
@@ -487,10 +471,7 @@ struct ModernPaymentRow: View {
                     .clipShape(Capsule())
             }
         }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.03), radius: 4, x: 0, y: 2)
+        .fieldPaySoftCard(padding: 16, cornerRadius: 16)
     }
     
     private var statusColor: Color {
@@ -514,20 +495,20 @@ struct ModernPaymentMethodButton: View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: method.icon)
-                    .font(.title2)
-                    .foregroundColor(isSelected ? .white : .primary)
+                    .font(FieldPayFont.title2)
+                    .foregroundColor(isSelected ? .white : FieldPayTheme.ink)
                     .frame(width: 44, height: 44)
                     .background(
                         isSelected ? 
-                        LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                        LinearGradient(colors: [Color(.systemGray6), Color(.systemGray6)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        FieldPayTheme.accentGradient :
+                        LinearGradient(colors: [FieldPayTheme.surfaceSoft, FieldPayTheme.surfaceSoft], startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 
                 Text(method.displayName)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(isSelected ? .blue : .primary)
+                    .font(FieldPayFont.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isSelected ? FieldPayTheme.accent : FieldPayTheme.ink)
                     .multilineTextAlignment(.center)
             }
         }
@@ -559,25 +540,23 @@ struct CustomerPickerView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Search Bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-                    
-                    TextField("Search customers...", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
+        VStack(spacing: 0) {
+            // Search Bar
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(FieldPayTheme.inkMuted)
+                
+                TextField("Search customers...", text: $searchText)
+                    .textFieldStyle(PlainTextFieldStyle())
                     
                     if !searchText.isEmpty {
                         Button(action: { searchText = "" }) {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.secondary)
+                                .foregroundColor(FieldPayTheme.inkMuted)
                         }
                     }
                 }
-                .padding(16)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .fieldPaySoftCard(padding: 14, cornerRadius: 16)
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
                 
@@ -603,34 +582,30 @@ struct CustomerPickerView: View {
                                     HStack(spacing: 16) {
                                         // Avatar
                                         Circle()
-                                            .fill(
-                                                LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                            )
+                                            .fill(FieldPayTheme.accentGradient)
                                             .frame(width: 50, height: 50)
                                             .overlay(
                                                 Text(customer.name.prefix(1).uppercased())
-                                                    .font(.title3)
-                                                    .fontWeight(.bold)
+                                                    .font(FieldPayFont.headline)
                                                     .foregroundColor(.white)
                                             )
                                         
                                         // Customer Info
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(customer.name)
-                                                .font(.headline)
-                                                .fontWeight(.semibold)
-                                                .foregroundColor(.primary)
+                                                .font(FieldPayFont.headline)
+                                                .foregroundColor(FieldPayTheme.ink)
                                             
                                             if let companyName = customer.companyName {
                                                 Text(companyName)
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.secondary)
+                                                    .font(FieldPayFont.callout)
+                                                    .foregroundColor(FieldPayTheme.inkMuted)
                                             }
                                             
                                             if let email = customer.email {
                                                 Text(email)
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
+                                                    .font(FieldPayFont.caption)
+                                                    .foregroundColor(FieldPayTheme.inkMuted)
                                             }
                                         }
                                         
@@ -639,14 +614,11 @@ struct CustomerPickerView: View {
                                         // Checkmark if selected
                                         if selectedCustomer?.id == customer.id {
                                             Image(systemName: "checkmark.circle.fill")
-                                                .foregroundColor(.blue)
+                                                .foregroundColor(FieldPayTheme.accent)
                                                 .font(.title2)
                                         }
                                     }
-                                    .padding(16)
-                                    .background(Color(.systemBackground))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+                                    .fieldPaySoftCard(padding: 16, cornerRadius: 16)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
@@ -657,8 +629,8 @@ struct CustomerPickerView: View {
                                     ProgressView()
                                         .scaleEffect(0.8)
                                     Text("Loading more customers...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .font(FieldPayFont.caption)
+                                        .foregroundColor(FieldPayTheme.inkMuted)
                                 }
                                 .padding()
                                 .onAppear {
@@ -699,32 +671,29 @@ struct PaymentTapToPayView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "wave.3.right")
                         .font(.system(size: 80))
-                        .foregroundColor(.blue)
+                        .foregroundColor(FieldPayTheme.accent)
                     
                     Text("Tap to Pay")
-                        .font(.title)
-                        .fontWeight(.bold)
+                        .font(FieldPayFont.title)
                     
                     Text("Hold customer's card near the top of your iPhone")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.callout)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                         .multilineTextAlignment(.center)
                 }
                 
                 // Amount Input
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Amount")
-                        .font(.headline)
-                        .fontWeight(.medium)
+                        .font(FieldPayFont.headline)
                     
                     HStack {
                         Text("$")
-                            .font(.title)
-                            .foregroundColor(.secondary)
+                            .font(FieldPayFont.title)
+                            .foregroundColor(FieldPayTheme.inkMuted)
                         
                         Text(String(format: "%.2f", (amount as NSDecimalNumber).doubleValue))
-                            .font(.title)
-                            .fontWeight(.bold)
+                            .font(FieldPayFont.title)
                     }
                 }
                 .padding(.horizontal)
@@ -748,11 +717,11 @@ struct PaymentTapToPayView: View {
                             Image(systemName: "creditcard.fill")
                         }
                         Text(isProcessing ? "Processing..." : "Start Payment")
-                            .fontWeight(.semibold)
+                            .font(FieldPayFont.headline)
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.green)
+                    .background(FieldPayTheme.successGradient)
                     .foregroundColor(.white)
                     .cornerRadius(12)
                 }
@@ -783,31 +752,28 @@ struct ModernCustomerPaymentRow: View {
         HStack(spacing: 16) {
             // Payment Icon
             Circle()
-                .fill(
-                    LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
+                .fill(FieldPayTheme.successGradient)
                 .frame(width: 50, height: 50)
                 .overlay(
                     Image(systemName: "creditcard.fill")
-                        .font(.title3)
+                        .font(FieldPayFont.headline)
                         .foregroundColor(.white)
                 )
             
             // Payment Details
             VStack(alignment: .leading, spacing: 4) {
                 Text(payment.paymentNumber)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.headline)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(payment.date, style: .date)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(FieldPayFont.caption)
+                    .foregroundColor(FieldPayTheme.inkMuted)
                 
                 if let memo = payment.memo, !memo.isEmpty {
                     Text(memo)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(FieldPayFont.caption)
+                        .foregroundColor(FieldPayTheme.inkMuted)
                         .lineLimit(1)
                 }
             }
@@ -817,13 +783,12 @@ struct ModernCustomerPaymentRow: View {
             // Amount and Status
             VStack(alignment: .trailing, spacing: 4) {
                 Text(String(format: "$%.2f", (payment.amount as NSDecimalNumber).doubleValue))
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .font(FieldPayFont.headline)
+                    .foregroundColor(FieldPayTheme.ink)
                 
                 Text(payment.status)
-                    .font(.caption)
-                    .fontWeight(.medium)
+                    .font(FieldPayFont.caption)
+                    .fontWeight(.semibold)
                     .foregroundColor(statusColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
@@ -831,10 +796,7 @@ struct ModernCustomerPaymentRow: View {
                     .clipShape(Capsule())
             }
         }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.03), radius: 4, x: 0, y: 2)
+        .fieldPaySoftCard(padding: 16, cornerRadius: 16)
     }
     
     private var statusColor: Color {

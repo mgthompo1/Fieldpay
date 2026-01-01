@@ -17,7 +17,10 @@ struct SettingsView: View {
     
     var body: some View {
         NavigationView {
-            List {
+            ZStack {
+                FieldPayBackground()
+                
+                List {
                 Section("Configuration") {
                     Button(action: {
                         showingCompanyBranding = true
@@ -575,7 +578,11 @@ struct StripeSettingsView: View {
                     }
                     .disabled(settingsViewModel.stripePublicKey.isEmpty || settingsViewModel.stripeSecretKey.isEmpty)
                 }
+                }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
             }
+            .navigationTitle("Settings")
         }
     }
 }
